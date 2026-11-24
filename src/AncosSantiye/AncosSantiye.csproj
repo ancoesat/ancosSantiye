@@ -15,7 +15,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The Web SDK already picks up skin.json; remove it first so every skin file is listed once. -->
+    <Content Remove="skins/**" />
     <Content Include="skins/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

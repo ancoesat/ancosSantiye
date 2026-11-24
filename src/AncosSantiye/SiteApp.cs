@@ -2,6 +2,7 @@ using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using AncosSantiye.Adapters;
+using Microsoft.Extensions.FileProviders;
 using AncosSantiye.Events;
 using AncosSantiye.Store;
 
@@ -42,6 +43,15 @@ public static class SiteApp
         if (skipped > 0)
         {
             app.Logger.LogWarning("Skipped {Count} unreadable lines in today's event log", skipped);
+        }
+
+        // The page and the skins. Both live next to the app, so an installed tool finds them from any folder.
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
+        var skins = Path.Combine(app.Environment.ContentRootPath, "skins");
+        if (Directory.Exists(skins))
+        {
+            app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(skins), RequestPath = "/skins" });
         }
 
         app.MapGet("/health", () => TypedResults.Ok(new { status = "ok" }));

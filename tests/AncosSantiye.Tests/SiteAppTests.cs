@@ -35,6 +35,19 @@ public sealed class SiteAppTests : IAsyncLifetime
         }
     }
 
+    [Theory]
+    [InlineData("/", "text/html", "<canvas id=\"site\"")]
+    [InlineData("/js/main.js", "text/javascript", "loadSkin")]
+    [InlineData("/skins/grafxkid/skin.json", "application/json", "\"characters\"")]
+    public async Task ServesThePageAndTheSkin(string path, string mediaType, string contains)
+    {
+        using var response = await _http.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(mediaType, response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains(contains, await response.Content.ReadAsStringAsync());
+    }
+
     [Fact]
     public void Server_ListensOnLoopbackOnly()
     {

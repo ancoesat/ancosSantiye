@@ -32,6 +32,10 @@ Planning docs (R1, R2, R3): https://claude.ai/artifact/78unfekyyMxxhwxRZgeu1o
 | `profiles/` | Example orchestra profile |
 | `scripts/check.sh` | The gate: dash grep, build, test |
 
+## Look at it
+
+- `dotnet run --project src/AncosSantiye`, then open http://127.0.0.1:5170 (live) or http://127.0.0.1:5170/?demo (fake site).
+
 ## Commands
 
 ```bash

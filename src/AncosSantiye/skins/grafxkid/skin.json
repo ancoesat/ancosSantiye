@@ -1,0 +1,64 @@
+{
+  "name": "grafxkid",
+  "license": "CC0 1.0, see licenses/",
+  "scene": { "width": 320, "height": 184, "groundY": 152 },
+  "background": "tiles/background-grassland.png",
+  "tiles": {
+    "grass": { "sheet": "tiles/terrain-grassland.png", "x": 64, "y": 16, "w": 16, "h": 16 },
+    "dirt": { "sheet": "tiles/terrain-grassland.png", "x": 64, "y": 64, "w": 16, "h": 16 },
+    "brick": { "sheet": "tiles/blocks.png", "x": 16, "y": 16, "w": 16, "h": 16 },
+    "glass": { "sheet": "tiles/blocks.png", "x": 112, "y": 16, "w": 16, "h": 16 },
+    "crate": { "sheet": "tiles/blocks.png", "x": 64, "y": 48, "w": 16, "h": 16 },
+    "fence": { "sheet": "tiles/fence-wire.png", "x": 0, "y": 0, "w": 32, "h": 48 }
+  },
+  "characters": {
+    "armand": {
+      "idle": { "sheet": "characters/armand/idle.png", "frameW": 32, "frameH": 32, "fps": 6 },
+      "walk": { "sheet": "characters/armand/walk.png", "frameW": 32, "frameH": 32, "fps": 10 },
+      "work": { "sheet": "characters/armand/idle-blink.png", "frameW": 32, "frameH": 32, "fps": 6 }
+    },
+    "geralt": {
+      "idle": { "sheet": "characters/geralt/idle.png", "frameW": 32, "frameH": 32, "fps": 4 },
+      "walk": { "sheet": "characters/geralt/run.png", "frameW": 32, "frameH": 32, "fps": 10 },
+      "work": { "sheet": "characters/geralt/carry-walk.png", "frameW": 32, "frameH": 32, "fps": 8 }
+    },
+    "robot-j5": {
+      "idle": { "sheet": "characters/robot-j5/idle.png", "frameW": 32, "frameH": 32, "fps": 6 },
+      "walk": { "sheet": "characters/robot-j5/walk.png", "frameW": 32, "frameH": 32, "fps": 10 },
+      "work": { "sheet": "characters/robot-j5/carry-walk.png", "frameW": 32, "frameH": 32, "fps": 8 }
+    },
+    "robot-walky": {
+      "idle": { "sheet": "characters/robot-walky/idle.png", "frameW": 32, "frameH": 32, "fps": 4 },
+      "walk": { "sheet": "characters/robot-walky/walk.png", "frameW": 32, "frameH": 32, "fps": 8 },
+      "work": { "sheet": "characters/robot-walky/walk.png", "frameW": 32, "frameH": 32, "fps": 8 }
+    },
+    "holly": {
+      "idle": { "sheet": "characters/holly/idle.png", "frameW": 32, "frameH": 32, "fps": 8 },
+      "walk": { "sheet": "characters/holly/run.png", "frameW": 32, "frameH": 32, "fps": 10 },
+      "work": { "sheet": "characters/holly/hammer.png", "frameW": 64, "frameH": 48, "fps": 10 }
+    },
+    "mr-circuit": {
+      "idle": { "sheet": "characters/mr-circuit/idle.png", "frameW": 32, "frameH": 32, "fps": 3 },
+      "walk": { "sheet": "characters/mr-circuit/run.png", "frameW": 32, "frameH": 32, "fps": 8 },
+      "work": { "sheet": "characters/mr-circuit/idle.png", "frameW": 32, "frameH": 32, "fps": 3 }
+    },
+    "tommy": {
+      "idle": { "sheet": "characters/tommy/idle.png", "frameW": 32, "frameH": 32, "fps": 4 },
+      "walk": { "sheet": "characters/tommy/walk.png", "frameW": 32, "frameH": 32, "fps": 10 },
+      "work": { "sheet": "characters/tommy/idle.png", "frameW": 32, "frameH": 32, "fps": 4 }
+    },
+    "gum-bot": {
+      "idle": { "sheet": "characters/gum-bot/idle.png", "frameW": 32, "frameH": 32, "fps": 4 },
+      "walk": { "sheet": "characters/gum-bot/walk.png", "frameW": 32, "frameH": 32, "fps": 10 },
+      "work": { "sheet": "characters/gum-bot/screen-off.png", "frameW": 32, "frameH": 32, "fps": 1 }
+    }
+  },
+  "roles": {
+    "chief": ["armand"],
+    "worker": ["geralt", "robot-j5", "robot-walky"],
+    "subcontractor": ["holly"],
+    "inspector": ["mr-circuit"],
+    "architect": ["tommy"],
+    "supplier": ["gum-bot"]
+  }
+}

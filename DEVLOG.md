@@ -46,12 +46,22 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Mutation checks on DeepSeek's own tests: repeated gate.pending, removed pending row not cleared, columns read by position (7 tests failed). All caught.
 - Not wired yet. When the folder watcher is added: skip a read that returns no rows when the last one had rows (a half-written file must not look like "all gates cleared"), and decide how delivery piece ids map to status file ids.
 
+## 2026-11-24 F4a: scene skeleton
+
+- No-build front end in `wwwroot/`: plain ES modules (`skin.js`, `sprites.js`, `cast.js`, `scene.js`, `stream.js`, `demo.js`, `main.js`), Canvas 2D at 320x184, whole-number scale, smoothing off. Name tags are HTML over the canvas so text stays sharp.
+- `skins/grafxkid/skin.json`: tiles by sheet coordinates, 8 characters with idle, walk and work animations, role to character lists. Frame counts come from image widths. A character is picked per actor from a hash of its name, so Explore and Plan look different and stay the same.
+- The server serves the page and the skins from the app folder. After every live event the page reads `/state` again (local, cheap, never out of step with the reducer).
+- `?demo` shows a fake site without Claude Code.
+- Tests: every sheet exists, holds whole frames, every tile fits its sheet, every role points at real characters; the page, a module and the skin are served. 132 tests. Mutation checks on the skin tests (bad frame width, missing sheet, tile outside its sheet, role to unknown character): all caught.
+- Checked in headless Chrome: demo shows all six roles walking in and animating; live hook events bring in the chief, an Explore worker and the reviewer, and `SubagentStop` walks the worker off. Screenshot: `docs/f4a-demo.png`.
+
 ## Problems
 
 | Problem | Cause | Fix |
 |---|---|---|
 | The dash gate passed a file that had an em dash in it (found by a mutation check) | `grep` exits 2, not 0, when one of its paths is missing, even if it also found a match. `docs` and `profiles` did not exist yet | `check.sh` now passes only paths that exist |
 | F3 files landed in the F2 commit without review | The coder lane finished while F2 was being committed with `git add -A` in the same tree | Reviewed afterwards (ONAY). Commits now name the piece's files |
+| `NETSDK1022` duplicate Content item for `skin.json` | The Web SDK already includes `**/*.json` as content | `Content Remove="skins/**"` before the include |
 | `dotnet run` listened on `localhost:5087`, not `127.0.0.1:5170` | The template's `launchSettings.json` sets the URL, so the code default was skipped | Deleted `launchSettings.json` |
 
 ## Lessons
