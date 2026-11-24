@@ -31,7 +31,7 @@ function phaseOf(stage) {
 }
 
 // The verdict wins: a torn piece stays torn whatever its status says.
-function lookOf(status, verdict) {
+export function lookOf(status, verdict) {
   const v = String(verdict ?? "").trim().toUpperCase();
   if (v === "DÜZELT" || v === "DUZELT") return "torn";
 

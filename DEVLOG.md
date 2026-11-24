@@ -69,6 +69,12 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - `props.js`: gate papers side by side instead of stacked.
 - Checked in headless Chrome: the building is no longer covered in any demo phase; a live worker with no floors stays at ground level. Screenshot: `docs/f4c-yerlesim.png`. 132 tests.
 
+## 2026-11-25 F5: side panels and notifications (DeepSeek)
+
+- `panels.js`: Waiting for you (gates, how long they wait), Pieces (stage, tasks, a colored dot per piece from the exported `lookOf` in `layout.js`), Budget (context, 5 hour and 7 day bars with reset times, cost, tokens, model), Activity (last 20 events). Everything is built with `createElement` and `textContent`.
+- `notify.js`: one beep (WebAudio) and one browser notification per new gate; the first state never alerts; sound setting kept in `localStorage`; every browser API wrapped in try/catch.
+- Claude checked: `check.sh` green (132 tests). No `innerHTML`, `insertAdjacentHTML`, `outerHTML`, `document.write` or `eval` in any front end file. In headless Chrome with the audio and notification APIs counted: opening `?demo=build` gave 0 alerts, the late demo gate gave exactly 1 beep and 1 notification, a reload gave 0. An agent named `<img src=x onerror=...>` sent through the hook endpoint showed as plain text and ran nothing. Empty texts present in `?demo=empty`. No console errors. Screenshot: `docs/f5-paneller.png`.
+
 ## Problems
 
 | Problem | Cause | Fix |
