@@ -75,13 +75,20 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - `notify.js`: one beep (WebAudio) and one browser notification per new gate; the first state never alerts; sound setting kept in `localStorage`; every browser API wrapped in try/catch.
 - Claude checked: `check.sh` green (132 tests). No `innerHTML`, `insertAdjacentHTML`, `outerHTML`, `document.write` or `eval` in any front end file. In headless Chrome with the audio and notification APIs counted: opening `?demo=build` gave 0 alerts, the late demo gate gave exactly 1 beep and 1 notification, a reload gave 0. An agent named `<img src=x onerror=...>` sent through the hook endpoint showed as plain text and ran nothing. Empty texts present in `?demo=empty`. No console errors. Screenshot: `docs/f5-paneller.png`.
 
-## Problems
+## 2026-11-25 F6: profile, skin, live folder lane
+
+- `Profiles/Profile.cs`: `skin`, `skinPath`, `folderLane` (directory, statusFile, project, intervalSeconds), `actions.enabled`. Loaded with `--profile <file>`; no profile means built-in skin, Claude Code only, read only. A missing or broken profile, or a skin folder without `skin.json`, stops the server with one clear line (exit 1), never a silent default. Comments and trailing commas allowed.
+- The active skin is always served at `/skin`, built in or from the profile's own folder. `main.js` loads from there.
+- `Adapters/FolderLane.cs`: a hosted service that polls once a second (no file watcher: they miss changes on WSL mounts and network drives). Status file: read only when its write time changes; a read with 0 rows after one that had rows is a half-written file, so the old view stays and the time is not stored, which makes the next tick read it again. Deliveries: `*.md` files named for this project; files already there at start are old news, only new ones arrive.
+- Claude checked: `check.sh` green (146 tests). Mutation checks caught: half-written guard, first-tick skip (after fixing the test, which read the version too late), project match, interval check, skin check. The write-time skip survives mutation by design: re-reading an unchanged file gives no events, so it only saves work. End to end with a copy of the real `ancosSantiye-durum.md`: stage F5 and the f5 gate on load; editing the file to F6 and dropping `ancosSantiye-007-gemini.md` moved the gate to f6 and showed the delivery within the poll, no console errors. Screenshot: `docs/f6-canli.png`.
+- Delivery ids (`ancosSantiye-007`) and status file ids (`santiye-f5`) are still separate id spaces, so a delivery shows as its own piece. Fine for now; joining them needs a naming rule, not code.
 
 | Problem | Cause | Fix |
 |---|---|---|
 | The dash gate passed a file that had an em dash in it (found by a mutation check) | `grep` exits 2, not 0, when one of its paths is missing, even if it also found a match. `docs` and `profiles` did not exist yet | `check.sh` now passes only paths that exist |
 | F3 files landed in the F2 commit without review | The coder lane finished while F2 was being committed with `git add -A` in the same tree | Reviewed afterwards (ONAY). Commits now name the piece's files |
 | `NETSDK1022` duplicate Content item for `skin.json` | The Web SDK already includes `**/*.json` as content | `Content Remove="skins/**"` before the include |
+| A mutation of the first-tick skip passed | The test read the state version after the first tick, so it could not see events published during that tick | The test asserts version 0 after the first tick |
 | `dotnet run` listened on `localhost:5087`, not `127.0.0.1:5170` | The template's `launchSettings.json` sets the URL, so the code default was skipped | Deleted `launchSettings.json` |
 
 ## Lessons

@@ -38,7 +38,7 @@ public sealed class SiteAppTests : IAsyncLifetime
     [Theory]
     [InlineData("/", "text/html", "<canvas id=\"site\"")]
     [InlineData("/js/main.js", "text/javascript", "loadSkin")]
-    [InlineData("/skins/grafxkid/skin.json", "application/json", "\"characters\"")]
+    [InlineData("/skin/skin.json", "application/json", "\"characters\"")]
     public async Task ServesThePageAndTheSkin(string path, string mediaType, string contains)
     {
         using var response = await _http.GetAsync(path);

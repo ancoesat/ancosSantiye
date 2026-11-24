@@ -25,16 +25,17 @@ Planning docs (R1, R2, R3): https://claude.ai/artifact/78unfekyyMxxhwxRZgeu1o
 | `src/AncosSantiye/Scene/` | `SiteState` and the reducer (pure function, no I/O) |
 | `src/AncosSantiye/Adapters/` | Claude Code hooks and status line feed, folder lane, status file parser |
 | `src/AncosSantiye/Actions/` | Commit and push, only when `actions.enabled` is true |
-| `src/AncosSantiye/Profiles/` | Profile model and the default profile |
+| `src/AncosSantiye/Profiles/` | Profile model: skin, folder lane, actions switch (`--profile <file>`) |
 | `src/AncosSantiye/wwwroot/` | No-build front end: plain ES modules, Canvas 2D, EventSource |
 | `src/AncosSantiye/skins/grafxkid/` | CC0 sprites, their licenses, `skin.json` |
 | `tests/AncosSantiye.Tests/` | xUnit tests and fixtures |
-| `profiles/` | Example orchestra profile |
+| `profiles/` | Example profile and example status file |
 | `scripts/check.sh` | The gate: dash grep, build, test |
 
 ## Look at it
 
 - `dotnet run --project src/AncosSantiye`, then open http://127.0.0.1:5170 (live) or http://127.0.0.1:5170/?demo (fake site).
+- With a folder lane: `dotnet run --project src/AncosSantiye -- --profile profiles/example-orchestra.json` (edit `directory` first).
 
 ## Commands
 
@@ -66,6 +67,7 @@ dotnet pack src/AncosSantiye -o artifacts  # the dotnet tool package
 
 ## Open items
 
+- Delivery ids (`project-NNN`) and status file ids are separate id spaces; a delivery shows as its own piece.
 - Hooks and the status line always target port 5170, even when `--urls` changes the server port.
 - Request bodies are not size capped beyond Kestrel's default (loopback only, so low risk).
 - On Esat's Windows machine `bash` resolves to WSL, where .NET is not installed. `check.sh` now falls back to `dotnet.exe`; confirm `bash scripts/check.sh` works from PowerShell. If not, point `bash` at Git Bash.

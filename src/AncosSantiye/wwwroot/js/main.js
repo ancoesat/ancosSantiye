@@ -24,7 +24,7 @@ let latestProject = demoMode ? "demo" : "";
 let state = null;
 let scale = 1;
 
-const skin = await loadSkin("/skins/grafxkid");
+const skin = await loadSkin("/skin");
 const { width, height } = skin.def.scene;
 canvas.width = width;
 canvas.height = height;

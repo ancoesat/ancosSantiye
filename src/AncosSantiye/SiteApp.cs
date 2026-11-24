@@ -4,6 +4,7 @@ using System.Text.Json;
 using AncosSantiye.Adapters;
 using Microsoft.Extensions.FileProviders;
 using AncosSantiye.Events;
+using AncosSantiye.Profiles;
 using AncosSantiye.Store;
 
 namespace AncosSantiye;
@@ -11,7 +12,10 @@ namespace AncosSantiye;
 /// <summary>Builds the web app. Tests call this with their own data folder and port 0.</summary>
 public static class SiteApp
 {
-    public static WebApplication Build(string[] args, string? dataDirectory = null, string? urls = null)
+    /// <summary>Thrown when the profile or its skin cannot be used. Program prints the message and exits.</summary>
+    public sealed class SetupException(string message) : Exception(message);
+
+    public static WebApplication Build(string[] args, string? dataDirectory = null, string? urls = null, Profile? profile = null)
     {
         // Content root is the app folder, not the current directory: an installed tool runs from anywhere.
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -31,11 +35,28 @@ public static class SiteApp
         builder.Services.ConfigureHttpJsonOptions(o =>
             o.SerializerOptions.DefaultIgnoreCondition = EventJson.Options.DefaultIgnoreCondition);
 
+        if (profile is null)
+        {
+            var (loaded, error) = Profile.Load(builder.Configuration["profile"]);
+            profile = loaded ?? throw new SetupException(error!);
+        }
+
+        var skinRoot = profile.SkinPath ?? Path.Combine(builder.Environment.ContentRootPath, "skins", profile.Skin);
+        if (!File.Exists(Path.Combine(skinRoot, "skin.json")))
+        {
+            throw new SetupException($"Skin not found: {skinRoot} has no skin.json");
+        }
+
         var log = new EventLog(dataDirectory ?? builder.Configuration["Santiye:DataDir"] ?? EventLog.DefaultDirectory);
         var hub = new SiteHub(log);
         builder.Services.AddSingleton(log);
         builder.Services.AddSingleton(hub);
         builder.Services.AddSingleton<StatusLineFeed>();
+        if (profile.FolderLane is { } lane)
+        {
+            builder.Services.AddSingleton(lane);
+            builder.Services.AddHostedService<FolderLane>();
+        }
 
         var app = builder.Build();
 
@@ -45,14 +66,10 @@ public static class SiteApp
             app.Logger.LogWarning("Skipped {Count} unreadable lines in today's event log", skipped);
         }
 
-        // The page and the skins. Both live next to the app, so an installed tool finds them from any folder.
+        // The page lives next to the app. The active skin (built in or the profile's own folder) is always at /skin.
         app.UseDefaultFiles();
         app.UseStaticFiles();
-        var skins = Path.Combine(app.Environment.ContentRootPath, "skins");
-        if (Directory.Exists(skins))
-        {
-            app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(skins), RequestPath = "/skins" });
-        }
+        app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(Path.GetFullPath(skinRoot)), RequestPath = "/skin" });
 
         app.MapGet("/health", () => TypedResults.Ok(new { status = "ok" }));
         app.MapGet("/state", (SiteHub h) => TypedResults.Ok(h.State));

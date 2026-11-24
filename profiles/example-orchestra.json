@@ -1,0 +1,12 @@
+{
+  // Example: a small orchestra. Claude Code hooks work without any profile;
+  // this adds a watched folder with a status file and delivery files.
+  "skin": "grafxkid",
+  "folderLane": {
+    "directory": "C:/Users/you/Developer/_phase-logs",
+    "statusFile": "my-project-status.md",
+    "project": "my-project",
+    "intervalSeconds": 1
+  },
+  "actions": { "enabled": false }
+}

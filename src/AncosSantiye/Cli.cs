@@ -44,7 +44,7 @@ public static class Cli
     }
 
     public const string Usage =
-        "Usage: ancos-santiye [--urls <url>] | statusline | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]";
+        "Usage: ancos-santiye [--urls <url>] [--profile <file>] | statusline | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]";
 
     /// <summary>No arguments, or only server options like --urls. Help flags are not a server start.</summary>
     public static bool IsServerStart(string[] args) =>
