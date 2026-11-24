@@ -138,13 +138,14 @@ function drawGateBoard(ctx, skin, model) {
   ctx.fillRect(292, 123, 14, 1);
 
   const papers = Math.min(3, model.gateCount);
+  // Side by side, so each waiting decision reads as its own sheet.
   for (let i = 0; i < papers; i += 1) {
-    const px = 294;
-    const py = 113 + i * 3;
+    const px = 293 + i * 4;
+    const py = 114;
     ctx.fillStyle = palette.paper;
-    ctx.fillRect(px, py, 6, 3);
+    ctx.fillRect(px, py, 3, 8);
     ctx.fillStyle = palette.alert;
-    ctx.fillRect(px + 4, py + 1, 1, 1);
+    ctx.fillRect(px + 1, py + 1, 1, 1);
   }
 }
 

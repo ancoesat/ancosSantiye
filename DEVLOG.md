@@ -60,7 +60,14 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - `layout.js` (pure: state to building model), `building.js` (slab, columns, floors, five wall looks, roof and sign), `props.js` (crane with a bobbing crate over the active slot, scaffolding, truck, site office, fence, gate board). `scene.js`, `demo.js` and `main.js` wired up. `?demo=empty|R1|R2|R3|build|done`.
 - No fix rounds, reviewer not required for draft / low. Claude checked: `check.sh` green (132 tests), no console errors in any demo phase in headless Chrome, and 13 node checks of `layout.js` against the brief (phases, looks, id order, crane target, 4 floor cap, tasks never negative, flags). Screenshot of all six phases: `docs/f4b-asamalar.png`.
 - DeepSeek changed three lines of `main.js` instead of one; the brief itself needed that (5e), it said so in its report.
-- Seen in the screenshots, for later: characters stand in front of the building and hide it (worker slots are inside x 96 to 192). The two gate papers overlap.
+- Seen in the screenshots: characters stood in front of the building and hid it, and the two gate papers overlapped. Fixed in F4c.
+
+## 2026-11-25 F4c: who stands where
+
+- `cast.js`: everyone waits on the ground outside the building (chief by the site office, reviewer right of the scaffold, architect left of the building, supplier by the truck, idle builders in a pool). Builders who are working climb the scaffold ladder and stand on top of the building, spread across it. With no floors yet, they stay on the ground. Changing level always goes by the ladder; leaving from the roof climbs down first. Sprites are drawn lowest last.
+- Name tags follow the character's height.
+- `props.js`: gate papers side by side instead of stacked.
+- Checked in headless Chrome: the building is no longer covered in any demo phase; a live worker with no floors stays at ground level. Screenshot: `docs/f4c-yerlesim.png`. 132 tests.
 
 ## Problems
 

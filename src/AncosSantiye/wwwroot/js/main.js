@@ -3,6 +3,7 @@ import { Cast } from "./cast.js";
 import { drawScene } from "./scene.js";
 import { connect } from "./stream.js";
 import { demoState } from "./demo.js";
+import { buildingFrom } from "./layout.js";
 
 const canvas = document.getElementById("site");
 const ctx = canvas.getContext("2d");
@@ -29,7 +30,7 @@ fit();
 
 function show(next) {
   state = next;
-  cast.sync(state.actors, width);
+  cast.sync(state.actors, width, buildingFrom(state));
 }
 
 function setConnected(on) {
@@ -66,7 +67,6 @@ requestAnimationFrame(frame);
 // Name tags live in HTML over the canvas, so text stays sharp at any scale.
 function drawTags() {
   const tags = cast.tags();
-  const groundY = skin.def.scene.groundY;
   const seen = new Set();
   for (const tag of tags) {
     seen.add(tag.id);
@@ -79,7 +79,7 @@ function drawTags() {
     }
     el.textContent = tag.label;
     el.style.left = `${tag.x * scale}px`;
-    el.style.top = `${(groundY - 36) * scale}px`;
+    el.style.top = `${(tag.y - 36) * scale}px`;
   }
   for (const el of [...tagLayer.children]) {
     if (!seen.has(el.dataset.id)) el.remove();

@@ -22,5 +22,5 @@ export function drawScene(ctx, skin, cast, ms, state) {
   drawProps(ctx, skin, model, ms);
   drawBuilding(ctx, skin, model);
 
-  cast.draw(ctx, ms, groundY);
+  cast.draw(ctx, ms);
 }
