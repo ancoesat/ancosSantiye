@@ -39,11 +39,19 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - 86 tests. Mutation checks, all caught: no backup, Origin allowed, tool_input leaking, no status line dedupe, duplicate install, no shape check, comments skipped, default encoder, symlink replaced, host filter open.
 - Smoke test with the real server: hook 204, foreign Origin 403, status line printed, `/state` shows the chief working, no tool input in the log.
 
+## 2026-11-24 F3: status file and delivery names (DeepSeek)
+
+- First piece from the coder lane (DeepSeek V4.1 Flash Free in OpenCode). `Adapters/StatusFile.cs` parses the status file (stage line, table read by column names) and diffs two snapshots into events. `Adapters/DeliveryFile.cs` reads `<project>-<NNN>-<gemini|studio>.md` names.
+- No fix rounds. Reviewer (Sonnet): ONAY. Its three missing tests (header case, pending status case and spaces, CRLF and BOM) were added by Claude. 126 tests.
+- Mutation checks on DeepSeek's own tests: repeated gate.pending, removed pending row not cleared, columns read by position (7 tests failed). All caught.
+- Not wired yet. When the folder watcher is added: skip a read that returns no rows when the last one had rows (a half-written file must not look like "all gates cleared"), and decide how delivery piece ids map to status file ids.
+
 ## Problems
 
 | Problem | Cause | Fix |
 |---|---|---|
 | The dash gate passed a file that had an em dash in it (found by a mutation check) | `grep` exits 2, not 0, when one of its paths is missing, even if it also found a match. `docs` and `profiles` did not exist yet | `check.sh` now passes only paths that exist |
+| F3 files landed in the F2 commit without review | The coder lane finished while F2 was being committed with `git add -A` in the same tree | Reviewed afterwards (ONAY). Commits now name the piece's files |
 | `dotnet run` listened on `localhost:5087`, not `127.0.0.1:5170` | The template's `launchSettings.json` sets the URL, so the code default was skipped | Deleted `launchSettings.json` |
 
 ## Lessons

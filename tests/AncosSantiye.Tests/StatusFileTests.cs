@@ -330,4 +330,51 @@ public class StatusFileTests
         Assert.Empty(StatusFile.Diff(snapshot, snapshot, "demo", At));
         Assert.Empty(StatusFile.Diff(snapshot, StatusFile.Parse(Example), "demo", At));
     }
+
+    [Fact]
+    public void Parse_HeaderNamesAreCaseAndSpaceInsensitive()
+    {
+        const string md = """
+            | ID | Status | Lane  /  Model |
+            |---|---|---|
+            | a-1 | sahada | coder / deepseek |
+            """;
+
+        var row = Assert.Single(StatusFile.Parse(md).Rows);
+
+        Assert.Equal("a-1", row.Id);
+        Assert.Equal("sahada", row.Status);
+        Assert.Equal("coder / deepseek", row.Lane);
+    }
+
+    [Fact]
+    public void Diff_PendingStatusIsCaseAndSpaceInsensitive()
+    {
+        var before = StatusFile.Parse("""
+            | id | status |
+            |---|---|
+            | a-1 | sahada |
+            """);
+        var after = StatusFile.Parse("""
+            | id | status |
+            |---|---|
+            | a-1 |   Onay Bekliyor   |
+            """);
+
+        var kinds = StatusFile.Diff(before, after, "demo", At).Select(e => e.Kind);
+
+        Assert.Equal([EventKinds.PieceStatus, EventKinds.GatePending], kinds);
+    }
+
+    [Fact]
+    public void Parse_HandlesWindowsLineEndingsAndABom()
+    {
+        var md = "\uFEFFAşama: F2\r\n\r\n| id | status |\r\n|---|---|\r\n| a-1 | bitti |\r\n";
+
+        var snapshot = StatusFile.Parse(md);
+
+        Assert.Equal("F2", snapshot.Stage);
+        Assert.Equal("bitti", Assert.Single(snapshot.Rows).Status);
+    }
 }
+

@@ -54,6 +54,7 @@ dotnet pack src/AncosSantiye -o artifacts  # the dotnet tool package
 
 ## Lessons
 
+- When two lanes work in this tree at once, commit with the piece's own paths (`git add <paths>`), never `git add -A`. A lane's "done" is checked with `git status`, not with its report.
 - Mutation-check every gate and test that guards a rule: break it on purpose, it must fail. (F0: the dash grep passed a dash because a missing path made grep exit 2.)
 - A command that writes a user's config accepts exact argument shapes only. A typo must never fall back to the real file. (F2 review.)
 - Settings files are refused, not repaired, when the parts we touch have an unexpected shape, comments or duplicate keys. Always back up before writing.
