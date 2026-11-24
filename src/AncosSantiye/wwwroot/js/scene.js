@@ -1,7 +1,10 @@
 import { drawTile } from "./sprites.js";
+import { buildingFrom } from "./layout.js";
+import { drawBuilding } from "./building.js";
+import { drawProps } from "./props.js";
 
-// Draws the static parts: sky, ground. The building and the site props come in F4b.
-export function drawScene(ctx, skin, cast, ms) {
+// Draws the static parts (sky, ground), then the site props, the building and the cast.
+export function drawScene(ctx, skin, cast, ms, state) {
   const { width, height, groundY } = skin.def.scene;
 
   for (let x = 0; x < width; x += skin.background.width) {
@@ -14,6 +17,10 @@ export function drawScene(ctx, skin, cast, ms) {
     drawTile(ctx, grass, x, groundY);
     for (let y = groundY + grass.h; y < height; y += dirt.h) drawTile(ctx, dirt, x, y);
   }
+
+  const model = buildingFrom(state);
+  drawProps(ctx, skin, model, ms);
+  drawBuilding(ctx, skin, model);
 
   cast.draw(ctx, ms, groundY);
 }

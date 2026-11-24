@@ -55,6 +55,13 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Tests: every sheet exists, holds whole frames, every tile fits its sheet, every role points at real characters; the page, a module and the skin are served. 132 tests. Mutation checks on the skin tests (bad frame width, missing sheet, tile outside its sheet, role to unknown character): all caught.
 - Checked in headless Chrome: demo shows all six roles walking in and animating; live hook events bring in the chief, an Explore worker and the reviewer, and `SubagentStop` walks the worker off. Screenshot: `docs/f4a-demo.png`.
 
+## 2026-11-25 F4b: building and site props (DeepSeek)
+
+- `layout.js` (pure: state to building model), `building.js` (slab, columns, floors, five wall looks, roof and sign), `props.js` (crane with a bobbing crate over the active slot, scaffolding, truck, site office, fence, gate board). `scene.js`, `demo.js` and `main.js` wired up. `?demo=empty|R1|R2|R3|build|done`.
+- No fix rounds, reviewer not required for draft / low. Claude checked: `check.sh` green (132 tests), no console errors in any demo phase in headless Chrome, and 13 node checks of `layout.js` against the brief (phases, looks, id order, crane target, 4 floor cap, tasks never negative, flags). Screenshot of all six phases: `docs/f4b-asamalar.png`.
+- DeepSeek changed three lines of `main.js` instead of one; the brief itself needed that (5e), it said so in its report.
+- Seen in the screenshots, for later: characters stand in front of the building and hide it (worker slots are inside x 96 to 192). The two gate papers overlap.
+
 ## Problems
 
 | Problem | Cause | Fix |

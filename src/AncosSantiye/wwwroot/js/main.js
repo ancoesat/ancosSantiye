@@ -14,6 +14,7 @@ const { width, height } = skin.def.scene;
 canvas.width = width;
 canvas.height = height;
 const cast = new Cast(skin);
+let state = null;
 let scale = 1;
 
 // Largest whole-number scale that fits next to the side panel.
@@ -26,7 +27,8 @@ function fit() {
 window.addEventListener("resize", fit);
 fit();
 
-function show(state) {
+function show(next) {
+  state = next;
   cast.sync(state.actors, width);
 }
 
@@ -36,7 +38,7 @@ function setConnected(on) {
 }
 
 if (new URLSearchParams(location.search).has("demo")) {
-  show(demoState());
+  show(demoState(new URLSearchParams(location.search).get("demo")));
   setConnected(true);
   connection.textContent = "demo";
 } else {
@@ -55,7 +57,7 @@ function frame(now) {
   last = now;
   ctx.imageSmoothingEnabled = false;
   cast.update(dt);
-  drawScene(ctx, skin, cast, now);
+  drawScene(ctx, skin, cast, now, state);
   drawTags();
   requestAnimationFrame(frame);
 }
