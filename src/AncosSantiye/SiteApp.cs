@@ -1,6 +1,7 @@
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using AncosSantiye.Actions;
 using AncosSantiye.Adapters;
 using Microsoft.Extensions.FileProviders;
 using AncosSantiye.Events;
@@ -24,9 +25,19 @@ public static class SiteApp
             ContentRootPath = AppContext.BaseDirectory,
         });
 
-        // Loopback only. `--urls` can still change the port, but F7 rejects any non-loopback host.
+        // Loopback only. `--urls` may change the port, never the host: with actions on, a LAN address
+        // would let any machine on the network read the token and commit.
         var configuredUrls = urls ?? builder.Configuration["urls"];
-        builder.WebHost.UseUrls(string.IsNullOrEmpty(configuredUrls) ? ServerOptions.DefaultUrl : configuredUrls);
+        var serverUrls = string.IsNullOrEmpty(configuredUrls) ? ServerOptions.DefaultUrl : configuredUrls;
+        foreach (var url in serverUrls.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Host is not ("127.0.0.1" or "localhost"))
+            {
+                throw new SetupException($"Only loopback addresses are allowed (127.0.0.1, localhost): {url}");
+            }
+        }
+
+        builder.WebHost.UseUrls(serverUrls);
 
         // DNS rebinding guard, set in code so it never depends on a config file being found.
         builder.Services.Configure<Microsoft.AspNetCore.HostFiltering.HostFilteringOptions>(o =>
@@ -45,6 +56,18 @@ public static class SiteApp
         if (!File.Exists(Path.Combine(skinRoot, "skin.json")))
         {
             throw new SetupException($"Skin not found: {skinRoot} has no skin.json");
+        }
+
+        var repos = new List<string>();
+        foreach (var repo in profile.ActionsEnabled ? profile.Actions!.Repos! : [])
+        {
+            var full = Path.GetFullPath(repo);
+            if (!Directory.Exists(Path.Combine(full, ".git")) && !File.Exists(Path.Combine(full, ".git")))
+            {
+                throw new SetupException($"actions.repos: not a git repo: {full}");
+            }
+
+            repos.Add(full);
         }
 
         var log = new EventLog(dataDirectory ?? builder.Configuration["Santiye:DataDir"] ?? EventLog.DefaultDirectory);
@@ -70,6 +93,19 @@ public static class SiteApp
         app.UseDefaultFiles();
         app.UseStaticFiles();
         app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(Path.GetFullPath(skinRoot)), RequestPath = "/skin" });
+
+        // What the page may show. The token is only here when actions are on, and only this page can read it:
+        // another site gets no CORS header, and the host filter stops DNS rebinding.
+        var guard = ActionGuard.Create();
+        var actions = profile.ActionsEnabled ? new GitActions(repos) : null;
+        app.MapGet("/config", () => TypedResults.Ok(actions is null
+            ? new { actionsEnabled = false, repos = (IReadOnlyList<string>)[], token = (string?)null }
+            : new { actionsEnabled = true, repos = actions.Names, token = (string?)guard.Token }));
+
+        if (actions is not null)
+        {
+            MapActions(app, actions, guard);
+        }
 
         app.MapGet("/health", () => TypedResults.Ok(new { status = "ok" }));
         app.MapGet("/state", (SiteHub h) => TypedResults.Ok(h.State));
@@ -119,6 +155,91 @@ public static class SiteApp
         });
 
         return app;
+    }
+
+    private sealed record RepoRequest(int Repo);
+
+    private sealed record CommitRequest(int Repo, string[]? Paths, string? Message);
+
+    /// <summary>Commit and push. Only mapped when the profile turns actions on: otherwise these paths are 404.</summary>
+    private static void MapActions(WebApplication app, GitActions actions, ActionGuard guard)
+    {
+        app.MapPost("/actions/status", async (HttpRequest request, CancellationToken ct) =>
+        {
+            if (guard.Reject(request) is { } rejected)
+            {
+                return rejected;
+            }
+
+            if (await Read<RepoRequest>(request, ct) is not { } body || actions.RepoAt(body.Repo) is not { } repo)
+            {
+                return TypedResults.BadRequest(new { ok = false, message = "Unknown repo." });
+            }
+
+            return await actions.Status(repo) is { } files
+                ? TypedResults.Ok(new { ok = true, files })
+                : TypedResults.BadRequest(new { ok = false, message = "git status failed in this folder." });
+        });
+
+        app.MapPost("/actions/commit", async (HttpRequest request, SiteHub hub, CancellationToken ct) =>
+        {
+            if (guard.Reject(request) is { } rejected)
+            {
+                return rejected;
+            }
+
+            if (await Read<CommitRequest>(request, ct) is not { } body)
+            {
+                return TypedResults.BadRequest(new { ok = false, message = "Bad request." });
+            }
+
+            return Answer(await actions.Commit(body.Repo, body.Paths, body.Message, DateTimeOffset.UtcNow), hub);
+        });
+
+        app.MapPost("/actions/push", async (HttpRequest request, SiteHub hub, CancellationToken ct) =>
+        {
+            if (guard.Reject(request) is { } rejected)
+            {
+                return rejected;
+            }
+
+            if (await Read<RepoRequest>(request, ct) is not { } body)
+            {
+                return TypedResults.BadRequest(new { ok = false, message = "Bad request." });
+            }
+
+            return Answer(await actions.Push(body.Repo, DateTimeOffset.UtcNow), hub);
+        });
+    }
+
+    private static IResult Answer(ActionOutcome? outcome, SiteHub hub)
+    {
+        if (outcome is null)
+        {
+            return TypedResults.Conflict(new { ok = false, message = "Another git action is running. Try again in a moment." });
+        }
+
+        if (outcome.Event is { } e)
+        {
+            hub.Publish(e);
+        }
+
+        return outcome.Ok
+            ? TypedResults.Ok(new { ok = true, message = outcome.Message })
+            : TypedResults.BadRequest(new { ok = false, message = outcome.Message });
+    }
+
+    private static async Task<T?> Read<T>(HttpRequest request, CancellationToken ct)
+        where T : class
+    {
+        try
+        {
+            return await JsonSerializer.DeserializeAsync<T>(request.Body, EventJson.Options, ct);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static async Task<JsonDocument?> ReadJson(HttpRequest request, CancellationToken ct)

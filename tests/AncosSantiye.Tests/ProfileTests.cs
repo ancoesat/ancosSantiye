@@ -52,12 +52,28 @@ public sealed class ProfileTests : IDisposable
     [InlineData("""{ "folderLane": { "directory": "d", "statusFile": "s.md" } }""", "folderLane needs")]
     [InlineData("""{ "folderLane": { "directory": "d", "statusFile": "s.md", "project": "p", "intervalSeconds": 0 } }""", "intervalSeconds")]
     [InlineData("""{ "skin": """, "not valid JSON")]
+    [InlineData("""{ "actions": { "enabled": true } }""", "actions.repos")]
+    [InlineData("""{ "actions": { "enabled": true, "repos": [] } }""", "actions.repos")]
     public void BadProfile_IsAnErrorNotADefault(string json, string message)
     {
         var (profile, error) = Profile.Load(Write(json));
 
         Assert.Null(profile);
         Assert.Contains(message, error);
+    }
+
+    [Fact]
+    public void RelativeFolders_StartAtTheProfileFile()
+    {
+        var (profile, error) = Profile.Load(Write("""
+            { "skinPath": "skin", "folderLane": { "directory": "../logs", "statusFile": "s.md", "project": "p" },
+              "actions": { "enabled": true, "repos": ["repo", "C:/abs/repo"] } }
+            """));
+
+        Assert.Null(error);
+        Assert.Equal(Path.Combine(_dir, "skin"), profile!.SkinPath);
+        Assert.Equal(Path.GetFullPath(Path.Combine(_dir, "..", "logs")), profile.FolderLane!.Directory);
+        Assert.Equal(Path.Combine(_dir, "repo"), profile.Actions!.Repos![0]);
     }
 
     [Fact]

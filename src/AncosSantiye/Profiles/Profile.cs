@@ -6,7 +6,8 @@ namespace AncosSantiye.Profiles;
 /// <summary>Watches a folder for a status file and delivery files (see <c>Adapters/FolderLane</c>).</summary>
 public sealed record FolderLaneProfile(string Directory, string StatusFile, string Project, double IntervalSeconds = 1);
 
-public sealed record ActionsProfile(bool Enabled = false);
+/// <summary>Commit and push from the screen. Off unless enabled, and only for the repos listed here.</summary>
+public sealed record ActionsProfile(bool Enabled = false, string[]? Repos = null);
 
 /// <summary>
 /// Everything personal lives here, never in the core: which skin, which folder to watch, whether
@@ -38,12 +39,25 @@ public sealed record Profile(
         try
         {
             var profile = JsonSerializer.Deserialize<Profile>(File.ReadAllText(path), Options);
-            return profile is null ? (null, $"Profile is empty: {path}") : Validate(profile, path);
+            return profile is null ? (null, $"Profile is empty: {path}") : Validate(Anchor(profile, Path.GetDirectoryName(Path.GetFullPath(path))!), path);
         }
         catch (JsonException ex)
         {
             return (null, $"Profile is not valid JSON ({path}): {ex.Message}");
         }
+    }
+
+    /// <summary>Relative folders in a profile mean "next to the profile file", wherever the server starts from.</summary>
+    private static Profile Anchor(Profile p, string dir)
+    {
+        string? At(string? folder) => string.IsNullOrWhiteSpace(folder) ? folder : Path.GetFullPath(folder, dir);
+
+        return p with
+        {
+            SkinPath = At(p.SkinPath),
+            FolderLane = p.FolderLane is { } lane ? lane with { Directory = At(lane.Directory)! } : null,
+            Actions = p.Actions is { } a ? a with { Repos = a.Repos?.Select(r => At(r)!).ToArray() } : null,
+        };
     }
 
     private static (Profile?, string?) Validate(Profile p, string path)
@@ -57,6 +71,11 @@ public sealed record Profile(
         if (p.FolderLane is { IntervalSeconds: <= 0 or > 60 })
         {
             return (null, $"Profile {path}: folderLane.intervalSeconds must be between 0 and 60.");
+        }
+
+        if (p.ActionsEnabled && (p.Actions!.Repos is not { Length: > 0 } repos || repos.Any(string.IsNullOrWhiteSpace)))
+        {
+            return (null, $"Profile {path}: actions.enabled needs actions.repos, the repo folders the screen may commit in.");
         }
 
         return (p, null);

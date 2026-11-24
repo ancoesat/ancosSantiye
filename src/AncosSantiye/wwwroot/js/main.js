@@ -6,6 +6,7 @@ import { demoState, demoEvents, demoLateGate } from "./demo.js";
 import { buildingFrom } from "./layout.js";
 import { renderPanels } from "./panels.js";
 import { Notifier } from "./notify.js";
+import { setupActions } from "./actions.js";
 
 const canvas = document.getElementById("site");
 const ctx = canvas.getContext("2d");
@@ -107,6 +108,7 @@ if (demoMode) {
       }
     }, 50);
   };
+  setupActions(document.getElementById("actions"));
   connect({
     onSnapshot: show,
     onEvent: (event) => {

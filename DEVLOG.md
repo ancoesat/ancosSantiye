@@ -83,12 +83,27 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Claude checked: `check.sh` green (146 tests). Mutation checks caught: half-written guard, first-tick skip (after fixing the test, which read the version too late), project match, interval check, skin check. The write-time skip survives mutation by design: re-reading an unchanged file gives no events, so it only saves work. End to end with a copy of the real `ancosSantiye-durum.md`: stage F5 and the f5 gate on load; editing the file to F6 and dropping `ancosSantiye-007-gemini.md` moved the gate to f6 and showed the delivery within the poll, no console errors. Screenshot: `docs/f6-canli.png`.
 - Delivery ids (`ancosSantiye-007`) and status file ids (`santiye-f5`) are still separate id spaces, so a delivery shows as its own piece. Fine for now; joining them needs a naming rule, not code.
 
+## 2026-11-25 F7: commit and push from the screen (high risk, Opus review)
+
+- `Actions/Git.cs`: git through `Process` with an argument list, never a shell; literal pathspecs, no prompts, a time limit that also covers the pipes. `Actions/GitActions.cs`: status (`-z --no-renames`), commit, push; one action at a time (busy is 409). `Actions/ActionGuard.cs`: own Origin, JSON, a random token made at every start, compared in constant time.
+- Commit: every path must be in `git status` right then; `git add -- paths`, then `git commit -F <temp file> -- paths`, so other staged changes stay out and the message stays exactly as written. A refused commit (for example a hook) unstages what was unstaged before. Push: a plain `git push`; the target is `@{push}`; if git cannot name it, nothing is pushed; nothing ahead means "Nothing to push" and no event.
+- Server: `/config` (token only when actions are on), `/actions/status|commit|push` only mapped when on, repos checked at start, every URL must be loopback. Profile: `actions.repos`; relative folders in a profile now start at the profile file's folder.
+- Front: `actions.js`, a Commit panel above the others: tick files, write the message, the browser's own confirm lists files and message; push has its own confirm. No "all" option exists.
+- Claude checked: `check.sh` green (197 tests). 22 guards mutation-checked, all caught (two only after new tests, see Problems). Headless Chrome with a real repo and a bare remote: only the picked file committed, quotes and a second line kept, push reached the remote, a page on another origin with the right token got "Failed to fetch". Screenshot: `docs/f7-commit.png`.
+- Opus denetçi: round 1 DÜZELT (8 findings: non-loopback `--urls`, no foreign Host test, pipes outside the time limit, temp file before the try, `@{u}` instead of `@{push}` and "up to date" counted as pushed, refused commit left files staged, confirm showed one line, check log without the check.sh run). All fixed with tests and mutations. Round 2 ONAY. Its leftovers: `[::1]` passed the URL check but not the host filter (fixed: only 127.0.0.1 and localhost); `Kestrel:Endpoints` bypass and the `MM` case went to Open items.
+- siyametrik-skills: deny list now blocks `/actions/` and `/config` on localhost; its README explains why and that it narrows, not closes, the path.
+
+## Problems
+
 | Problem | Cause | Fix |
 |---|---|---|
 | The dash gate passed a file that had an em dash in it (found by a mutation check) | `grep` exits 2, not 0, when one of its paths is missing, even if it also found a match. `docs` and `profiles` did not exist yet | `check.sh` now passes only paths that exist |
 | F3 files landed in the F2 commit without review | The coder lane finished while F2 was being committed with `git add -A` in the same tree | Reviewed afterwards (ONAY). Commits now name the piece's files |
 | `NETSDK1022` duplicate Content item for `skin.json` | The Web SDK already includes `**/*.json` as content | `Content Remove="skins/**"` before the include |
 | `dotnet run --project src/AncosSantiye -- --profile ../x.json` said "Profile not found" | The Web SDK runs the app from the project folder, so relative paths started from `src/AncosSantiye`, not from where the command was typed | `RunWorkingDirectory` set to `$(MSBuildStartupDirectory)`, same as the installed tool; the error now prints the full path it looked at |
+| Removing `GIT_LITERAL_PATHSPECS` passed all tests | git reads a name literally when that file exists, so the bracket test could not see it | New test: commit a deleted `[ab].txt`; without the flag git also staged `a.txt` |
+| `@{push}` replaced by `@{u}` passed | In the test both pointed at the same branch | New test with `remote.pushDefault`: under `push.default=simple` git cannot name `@{push}`, so the screen refuses; with `current` it pushes to `backup/main` |
+| My F6 DEVLOG edit dropped the `## Problems` heading | A text replace swapped the heading out and did not put it back | Restored in F7 |
 | A mutation of the first-tick skip passed | The test read the state version after the first tick, so it could not see events published during that tick | The test asserts version 0 after the first tick |
 | `dotnet run` listened on `localhost:5087`, not `127.0.0.1:5170` | The template's `launchSettings.json` sets the URL, so the code default was skipped | Deleted `launchSettings.json` |
 

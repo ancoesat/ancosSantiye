@@ -20,6 +20,8 @@ public static class EventKinds
     public const string ReviewVerdict = "review.verdict";
     public const string GatePending = "gate.pending";
     public const string GateCleared = "gate.cleared";
+    public const string ActionCommit = "action.commit";
+    public const string ActionPush = "action.push";
 }
 
 /// <summary>Who an actor is on the site.</summary>
@@ -39,4 +41,5 @@ public static class Sources
     public const string ClaudeCode = "claude-code";
     public const string OpenCode = "opencode";
     public const string Folder = "folder";
+    public const string Screen = "screen";
 }

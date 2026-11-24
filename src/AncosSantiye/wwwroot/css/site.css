@@ -52,7 +52,7 @@ main {
 
 #tags { position: absolute; inset: 0; pointer-events: none; }
 
-#panels { flex: 1; min-width: 220px; }
+#side { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 12px; }
 
 .tag {
   position: absolute;
@@ -241,3 +241,24 @@ main {
   color: var(--quiet);
   font-variant-numeric: tabular-nums;
 }
+
+/* Commit panel (only when the profile turns actions on) */
+#actions select,
+#actions textarea {
+  width: 100%;
+  margin: 6px 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: #2a2e36;
+  border: 1px solid #3a3f4a;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.action-files { max-height: 220px; overflow-y: auto; }
+.action-file { cursor: pointer; font-size: 12px; }
+.action-code { flex: none; width: 2ch; color: var(--quiet); font-family: ui-monospace, monospace; }
+.action-result { margin: 4px 0 0; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.action-result.ok { color: var(--ok); }
+.action-result.off { color: var(--off); }

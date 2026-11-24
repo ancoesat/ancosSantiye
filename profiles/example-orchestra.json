@@ -8,5 +8,6 @@
     "project": "my-project",
     "intervalSeconds": 1
   },
-  "actions": { "enabled": false }
+  // Commit and push from the screen. Off by default; when on, list the repo folders it may touch.
+  "actions": { "enabled": false, "repos": [] }
 }

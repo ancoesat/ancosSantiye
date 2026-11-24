@@ -52,10 +52,11 @@ dotnet pack src/AncosSantiye -o artifacts  # the dotnet tool package
 3. No build step for the front end. No npm, no bundler.
 4. Events never carry code, diffs, file contents or secrets. Only names, ids, counts, statuses.
 5. The reducer in `Scene/` is pure: same events in, same state out. All I/O stays in adapters and the store.
-6. Actions (commit, push) exist only behind `actions.enabled`. When it is false the endpoints are not mapped at all.
+6. Actions (commit, push) exist only behind `actions.enabled`. When it is false the endpoints are not mapped at all. The page sends a repo index, never a path; every file must be in the server's own `git status`; push is a plain `git push` to `@{push}`, never with arguments. Each request needs the server's own Origin, JSON and the per-start token.
+   Known limit: a local program can read the token from `/config` like the page does. The agent deny list (`siyametrik-skills/claude-code/settings-ornek.json`) blocks `/actions/` and `/config` on localhost; keep actions off when you do not need them.
 7. Sprites come from packs with a license that allows redistribution (CC0 today). Never draw pixel art by hand. Simple shapes in code (rectangles, lines) are fine.
 8. No em or en dashes anywhere: code, comments, docs, UI text.
-9. Git: no commits, pushes or branches from any agent. Esat commits and pushes.
+9. Git: no commits, pushes or branches from any agent, and no calls to `/actions/*` either. Esat commits and pushes, by terminal or from the screen.
 
 ## Lessons
 
@@ -64,10 +65,16 @@ dotnet pack src/AncosSantiye -o artifacts  # the dotnet tool package
 - A command that writes a user's config accepts exact argument shapes only. A typo must never fall back to the real file. (F2 review.)
 - Settings files are refused, not repaired, when the parts we touch have an unexpected shape, comments or duplicate keys. Always back up before writing.
 - Do not add `Properties/launchSettings.json`. It overrides the loopback default URL.
+- An Origin check against `request.Host` is only as good as the host filter in front of it. Test the filter with a foreign Host and a matching Origin. (F7 review.)
+- `@{u}` is not always where `git push` goes; `@{push}` is. If git cannot name it, do not push. (F7 review.)
+- A time limit on a child process must cover reading its pipes too, not only waiting for exit. (F7 review.)
 
 ## Open items
 
 - Delivery ids (`project-NNN`) and status file ids are separate id spaces; a delivery shows as its own piece.
+- A `Kestrel:Endpoints` setting (appsettings or `Kestrel__Endpoints__*` env) overrides `UseUrls` and skips the loopback check. Close it by checking the real bound addresses after start.
+- A refused commit of a partly staged file (`MM`) leaves its whole working copy staged, and the message does not say so.
+- README (F8) must carry the actions known limit from Rule 6.
 - Hooks and the status line always target port 5170, even when `--urls` changes the server port.
 - Request bodies are not size capped beyond Kestrel's default (loopback only, so low risk).
 - On Esat's Windows machine `bash` resolves to WSL, where .NET is not installed. `check.sh` now falls back to `dotnet.exe`; confirm `bash scripts/check.sh` works from PowerShell. If not, point `bash` at Git Bash.
