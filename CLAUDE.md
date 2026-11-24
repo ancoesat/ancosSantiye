@@ -17,7 +17,9 @@ Planning docs (R1, R2, R3): https://claude.ai/artifact/78unfekyyMxxhwxRZgeu1o
 
 | Path | What |
 |---|---|
-| `src/AncosSantiye/Program.cs` | Startup and endpoints |
+| `src/AncosSantiye/Program.cs` | Entry: no args starts the server, otherwise `Cli` |
+| `src/AncosSantiye/SiteApp.cs` | Builds the web app and its endpoints |
+| `src/AncosSantiye/Cli.cs` | `statusline`, `hooks print / install / uninstall` |
 | `src/AncosSantiye/Events/` | The one event shape every adapter emits |
 | `src/AncosSantiye/Store/` | NDJSON log and in-process event bus |
 | `src/AncosSantiye/Scene/` | `SiteState` and the reducer (pure function, no I/O) |
@@ -53,9 +55,13 @@ dotnet pack src/AncosSantiye -o artifacts  # the dotnet tool package
 ## Lessons
 
 - Mutation-check every gate and test that guards a rule: break it on purpose, it must fail. (F0: the dash grep passed a dash because a missing path made grep exit 2.)
+- A command that writes a user's config accepts exact argument shapes only. A typo must never fall back to the real file. (F2 review.)
+- Settings files are refused, not repaired, when the parts we touch have an unexpected shape, comments or duplicate keys. Always back up before writing.
 - Do not add `Properties/launchSettings.json`. It overrides the loopback default URL.
 
 ## Open items
 
+- Hooks and the status line always target port 5170, even when `--urls` changes the server port.
+- Request bodies are not size capped beyond Kestrel's default (loopback only, so low risk).
 - On Esat's Windows machine `bash` resolves to WSL, where .NET is not installed. `check.sh` now falls back to `dotnet.exe`; confirm `bash scripts/check.sh` works from PowerShell. If not, point `bash` at Git Bash.
 - Test on Esat's machine: does a `type: "http"` hook print visible error noise in Claude Code while the server is down? See DEVLOG F0.

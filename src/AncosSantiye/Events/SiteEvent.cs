@@ -21,7 +21,7 @@ public sealed record SiteEvent(
     string? Piece,
     IReadOnlyDictionary<string, string>? Data)
 {
-    /// <summary>Longest value kept in <see cref="Data"/>. Longer values are cut, so nothing big slips in.</summary>
+    /// <summary>Longest string kept anywhere in an event. Longer values are cut, so nothing big slips in.</summary>
     public const int MaxDataValueLength = 200;
 
     public static SiteEvent Create(
@@ -35,11 +35,14 @@ public sealed record SiteEvent(
         DateTimeOffset? ts = null)
     {
         var at = ts ?? DateTimeOffset.UtcNow;
-        return new SiteEvent(Guid.CreateVersion7(at), at, source, project, session, actor, kind, piece, Trim(data));
+        var who = actor with { Id = Cap(actor.Id)!, Role = Cap(actor.Role)!, Name = Cap(actor.Name) };
+        return new SiteEvent(Guid.CreateVersion7(at), at, Cap(source)!, Cap(project)!, Cap(session), who, Cap(kind)!, Cap(piece), Trim(data));
     }
+
+    private static string? Cap(string? s) => s is { Length: > MaxDataValueLength } ? s[..MaxDataValueLength] : s;
 
     private static Dictionary<string, string>? Trim(IReadOnlyDictionary<string, string>? data) =>
         data?.ToDictionary(
             kv => kv.Key,
-            kv => kv.Value.Length <= MaxDataValueLength ? kv.Value : kv.Value[..MaxDataValueLength]);
+            kv => Cap(kv.Value)!);
 }

@@ -1,5 +1,7 @@
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using AncosSantiye.Adapters;
 using AncosSantiye.Events;
 using AncosSantiye.Store;
 
@@ -10,11 +12,20 @@ public static class SiteApp
 {
     public static WebApplication Build(string[] args, string? dataDirectory = null, string? urls = null)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        // Content root is the app folder, not the current directory: an installed tool runs from anywhere.
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            Args = args,
+            ContentRootPath = AppContext.BaseDirectory,
+        });
 
         // Loopback only. `--urls` can still change the port, but F7 rejects any non-loopback host.
         var configuredUrls = urls ?? builder.Configuration["urls"];
         builder.WebHost.UseUrls(string.IsNullOrEmpty(configuredUrls) ? ServerOptions.DefaultUrl : configuredUrls);
+
+        // DNS rebinding guard, set in code so it never depends on a config file being found.
+        builder.Services.Configure<Microsoft.AspNetCore.HostFiltering.HostFilteringOptions>(o =>
+            o.AllowedHosts = ["127.0.0.1", "localhost"]);
 
         builder.Services.ConfigureHttpJsonOptions(o =>
             o.SerializerOptions.DefaultIgnoreCondition = EventJson.Options.DefaultIgnoreCondition);
@@ -23,6 +34,7 @@ public static class SiteApp
         var hub = new SiteHub(log);
         builder.Services.AddSingleton(log);
         builder.Services.AddSingleton(hub);
+        builder.Services.AddSingleton<StatusLineFeed>();
 
         var app = builder.Build();
 
@@ -36,7 +48,62 @@ public static class SiteApp
         app.MapGet("/state", (SiteHub h) => TypedResults.Ok(h.State));
         app.MapGet("/events", (SiteHub h, CancellationToken ct) => TypedResults.ServerSentEvents(Stream(h, ct)));
 
+        // Claude Code hooks. Answer at once: an HTTP hook blocks Claude Code until it returns.
+        app.MapPost("/hooks/claude", async (HttpRequest request, SiteHub h, CancellationToken ct) =>
+        {
+            if (LocalOnly.Reject(request) is { } rejected)
+            {
+                return rejected;
+            }
+
+            using var body = await ReadJson(request, ct);
+            if (body is null)
+            {
+                return TypedResults.BadRequest();
+            }
+
+            if (ClaudeHookMapper.Map(body.RootElement, DateTimeOffset.UtcNow) is { } e)
+            {
+                h.Publish(e);
+            }
+
+            return TypedResults.NoContent();
+        });
+
+        app.MapPost("/feeds/statusline", async (HttpRequest request, SiteHub h, StatusLineFeed feed, CancellationToken ct) =>
+        {
+            if (LocalOnly.Reject(request) is { } rejected)
+            {
+                return rejected;
+            }
+
+            using var body = await ReadJson(request, ct);
+            if (body is null)
+            {
+                return TypedResults.BadRequest();
+            }
+
+            if (feed.Map(body.RootElement, DateTimeOffset.UtcNow) is { } e)
+            {
+                h.Publish(e);
+            }
+
+            return TypedResults.NoContent();
+        });
+
         return app;
+    }
+
+    private static async Task<JsonDocument?> ReadJson(HttpRequest request, CancellationToken ct)
+    {
+        try
+        {
+            return await JsonDocument.ParseAsync(request.Body, cancellationToken: ct);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>First a "snapshot" of the whole site, then every new "event" as it happens.</summary>

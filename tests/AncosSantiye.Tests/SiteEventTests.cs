@@ -14,6 +14,17 @@ public class SiteEventTests
     }
 
     [Fact]
+    public void Create_CutsEveryLongString()
+    {
+        var big = new string('y', 5000);
+        var e = SiteEvent.Create(big, big, new Actor(big, big, big), big, session: big, piece: big);
+
+        Assert.All(
+            new[] { e.Source, e.Project, e.Session!, e.Actor.Id, e.Actor.Role, e.Actor.Name!, e.Kind, e.Piece! },
+            s => Assert.Equal(SiteEvent.MaxDataValueLength, s.Length));
+    }
+
+    [Fact]
     public void Create_IdsSortByTime()
     {
         var first = Ev.At(0, EventKinds.SessionStart);

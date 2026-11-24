@@ -1,0 +1,73 @@
+using System.Text.Json.Nodes;
+
+namespace AncosSantiye.Tests;
+
+public class CliTests
+{
+    [Fact]
+    public async Task HooksPrint_PrintsValidJsonWithOurHookUrl()
+    {
+        var output = new StringWriter();
+
+        var code = await Cli.Run(["hooks", "print"], new StringReader(""), output, new StringWriter());
+
+        Assert.Equal(0, code);
+        Assert.Contains("http://127.0.0.1:5170/hooks/claude", output.ToString());
+        Assert.NotNull(JsonNode.Parse(output.ToString()));
+    }
+
+    [Fact]
+    public async Task StatusLine_ServerDown_StillPrintsALine()
+    {
+        var output = new StringWriter();
+
+        var code = await Cli.Run(["statusline"], new StringReader("""{"context_window":{"used_percentage":5}}"""), output, new StringWriter());
+
+        Assert.Equal(0, code);
+        Assert.StartsWith("santiye", output.ToString());
+        Assert.Contains("ctx 5%", output.ToString());
+    }
+
+    [Fact]
+    public async Task UnknownCommand_ShowsUsage()
+    {
+        var error = new StringWriter();
+
+        Assert.Equal(2, await Cli.Run(["nope"], new StringReader(""), new StringWriter(), error));
+        Assert.Contains("Usage", error.ToString());
+    }
+
+    [Theory]
+    [InlineData("hooks", "install", "--settings")]
+    [InlineData("hooks", "install", "--setting", "x.json")]
+    [InlineData("hooks", "install", "x.json")]
+    [InlineData("hooks", "uninstall", "--settings")]
+    public async Task HooksWithBadArguments_NeverFallBackToTheRealSettings(params string[] args)
+    {
+        var error = new StringWriter();
+
+        Assert.Equal(2, await Cli.Run(args, new StringReader(""), new StringWriter(), error));
+        Assert.Contains("Usage", error.ToString());
+    }
+
+    [Theory]
+    [InlineData("--help")]
+    [InlineData("-h")]
+    public async Task Help_PrintsUsageAndIsNotAServerStart(string flag)
+    {
+        var output = new StringWriter();
+
+        Assert.False(Cli.IsServerStart([flag]));
+        Assert.Equal(0, await Cli.Run([flag], new StringReader(""), output, new StringWriter()));
+        Assert.Contains("Usage", output.ToString());
+    }
+
+    [Theory]
+    [InlineData(new string[0], true)]
+    [InlineData(new[] { "--urls", "http://127.0.0.1:6000" }, true)]
+    [InlineData(new[] { "hooks", "print" }, false)]
+    public void IsServerStart_OnlyForNoArgsOrOptions(string[] args, bool expected)
+    {
+        Assert.Equal(expected, Cli.IsServerStart(args));
+    }
+}

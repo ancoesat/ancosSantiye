@@ -84,6 +84,81 @@ public sealed class SiteAppTests : IAsyncLifetime
         await Task.CompletedTask;
     }
 
+    private const string Hook = """{"hook_event_name":"SubagentStart","cwd":"/p/demo","agent_id":"agent_1","agent_type":"Explore"}""";
+
+    private static StringContent Json(string body) => new(body, System.Text.Encoding.UTF8, "application/json");
+
+    [Fact]
+    public async Task ForeignHostHeader_IsRejected()
+    {
+        // DNS rebinding: a page on evil.example resolves to 127.0.0.1 and reads /state same-origin.
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/state");
+        request.Headers.Host = "evil.example";
+
+        using var response = await _http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public void HostFilter_IsSetInCodeNotOnlyInAConfigFile()
+    {
+        var options = _app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.HostFiltering.HostFilteringOptions>>().Value;
+
+        Assert.Equal(["127.0.0.1", "localhost"], options.AllowedHosts);
+    }
+
+    [Fact]
+    public async Task HookPost_PublishesAndAnswersNoContent()
+    {
+        using var response = await _http.PostAsync("/hooks/claude", Json(Hook));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(_app.Services.GetRequiredService<SiteHub>().State.Actors.ContainsKey("agent_1"));
+    }
+
+    [Fact]
+    public async Task HookPost_FromABrowserPage_IsRejected()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/hooks/claude") { Content = Json(Hook) };
+        request.Headers.Add("Origin", "https://evil.example");
+
+        using var response = await _http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(0, _app.Services.GetRequiredService<SiteHub>().State.Version);
+    }
+
+    [Fact]
+    public async Task HookPost_NotJson_IsRejected()
+    {
+        using var response = await _http.PostAsync("/hooks/claude", new StringContent(Hook, System.Text.Encoding.UTF8, "text/plain"));
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+        Assert.Equal(0, _app.Services.GetRequiredService<SiteHub>().State.Version);
+    }
+
+    [Fact]
+    public async Task HookPost_BrokenJson_IsABadRequest()
+    {
+        using var response = await _http.PostAsync("/hooks/claude", Json("{nope"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task StatusLinePost_UpdatesUsageOnceForSameValues()
+    {
+        const string status = """{"session_id":"s","context_window":{"used_percentage":12}}""";
+        var hub = _app.Services.GetRequiredService<SiteHub>();
+
+        (await _http.PostAsync("/feeds/statusline", Json(status))).Dispose();
+        (await _http.PostAsync("/feeds/statusline", Json(status))).Dispose();
+
+        Assert.Equal("12", hub.State.Usage["contextUsedPercentage"]);
+        Assert.Equal(1, hub.State.Version);
+    }
+
     private static async Task<(string? Type, string Data)> NextSseItem(StreamReader reader, CancellationToken ct)
     {
         string? type = null;

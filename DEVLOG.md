@@ -29,6 +29,16 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Mutation checks, all caught: the reducer reading the clock (2 tests failed), a public default URL (1), no data trimming (1).
 - `check.sh` falls back to `dotnet.exe` so it also runs from WSL bash.
 
+## 2026-11-24 F2: Claude Code adapter
+
+- `POST /hooks/claude`: maps 10 hook events to site events. Reads only names and ids (`hook_event_name`, `session_id`, `cwd`, `tool_name`, `agent_id`, `agent_type`), never `tool_input`, prompts or messages. Answers 204 at once.
+- `POST /feeds/statusline` and `ancos-santiye statusline`: the status line JSON becomes a `usage` event (context, tokens, cost, 5 hour and 7 day limits), only when a value changed. The command forwards with a 500 ms timeout and always prints a line.
+- `ancos-santiye hooks print | install | uninstall [--settings <path>]`: merges our HTTP hooks (timeout 2 s) and the status line into `~/.claude/settings.json`.
+- Guards: write endpoints refuse an `Origin` header (403) and non-JSON bodies (415). Host filtering (`127.0.0.1`, `localhost`) is set in code against DNS rebinding. Content root is the app folder, so an installed tool behaves the same from any directory. Every string in an event is capped at 200 chars.
+- Reviewer (Opus), round 1: DÜZELT with 8 findings. The serious one: `hooks install` with a mistyped `--settings` fell back to the real settings file. Others: wrong-shaped `hooks` silently replaced, crashes on odd entries, host filter depending on a config file, comments dropped on write, symlinked settings replaced, non-ASCII escaped, `--help` starting the server. All fixed with tests. Round 2: ONAY. Two of its minor notes also fixed (dangling symlink, duplicate keys).
+- 86 tests. Mutation checks, all caught: no backup, Origin allowed, tool_input leaking, no status line dedupe, duplicate install, no shape check, comments skipped, default encoder, symlink replaced, host filter open.
+- Smoke test with the real server: hook 204, foreign Origin 403, status line printed, `/state` shows the chief working, no tool input in the log.
+
 ## Problems
 
 | Problem | Cause | Fix |
@@ -38,4 +48,5 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 
 ## Lessons
 
+- A command that writes a user's config accepts exact argument shapes only. A typo must never fall back to the real file.
 - A gate is only trusted after a mutation check: break it on purpose, see it fail.
