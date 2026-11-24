@@ -7,6 +7,8 @@
     <RootNamespace>AncosSantiye</RootNamespace>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>ancos-santiye</ToolCommandName>
+    <!-- dotnet run starts in the project folder by default; start where the user is, like the installed tool. -->
+    <RunWorkingDirectory>$(MSBuildStartupDirectory)</RunWorkingDirectory>
     <PackageId>AncosSantiye</PackageId>
     <Version>0.1.0</Version>
     <Authors>Mehmet Esat Comlekci</Authors>

@@ -88,6 +88,7 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 | The dash gate passed a file that had an em dash in it (found by a mutation check) | `grep` exits 2, not 0, when one of its paths is missing, even if it also found a match. `docs` and `profiles` did not exist yet | `check.sh` now passes only paths that exist |
 | F3 files landed in the F2 commit without review | The coder lane finished while F2 was being committed with `git add -A` in the same tree | Reviewed afterwards (ONAY). Commits now name the piece's files |
 | `NETSDK1022` duplicate Content item for `skin.json` | The Web SDK already includes `**/*.json` as content | `Content Remove="skins/**"` before the include |
+| `dotnet run --project src/AncosSantiye -- --profile ../x.json` said "Profile not found" | The Web SDK runs the app from the project folder, so relative paths started from `src/AncosSantiye`, not from where the command was typed | `RunWorkingDirectory` set to `$(MSBuildStartupDirectory)`, same as the installed tool; the error now prints the full path it looked at |
 | A mutation of the first-tick skip passed | The test read the state version after the first tick, so it could not see events published during that tick | The test asserts version 0 after the first tick |
 | `dotnet run` listened on `localhost:5087`, not `127.0.0.1:5170` | The template's `launchSettings.json` sets the URL, so the code default was skipped | Deleted `launchSettings.json` |
 

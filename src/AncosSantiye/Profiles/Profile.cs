@@ -32,7 +32,7 @@ public sealed record Profile(
 
         if (!File.Exists(path))
         {
-            return (null, $"Profile not found: {path}");
+            return (null, $"Profile not found: {Path.GetFullPath(path)}");
         }
 
         try
