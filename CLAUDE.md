@@ -57,4 +57,5 @@ dotnet pack src/AncosSantiye -o artifacts  # the dotnet tool package
 
 ## Open items
 
+- On Esat's Windows machine `bash` resolves to WSL, where .NET is not installed. `check.sh` now falls back to `dotnet.exe`; confirm `bash scripts/check.sh` works from PowerShell. If not, point `bash` at Git Bash.
 - Test on Esat's machine: does a `type: "http"` hook print visible error noise in Claude Code while the server is down? See DEVLOG F0.

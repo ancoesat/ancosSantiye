@@ -18,6 +18,17 @@ From the hooks docs: a connection failure and a non-2xx status are non-blocking 
 
 Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and returns `204 No Content` at once (an empty 2xx body is a success, plain text is treated as an error). Still to test on Esat's machine: whether a refused connection prints visible noise in the Claude Code UI on every tool call.
 
+## 2026-11-24 F1: core
+
+- `Events/`: `SiteEvent` (UUIDv7 ids from `Guid.CreateVersion7`, data values cut at 200 chars), event kinds, roles, sources, one JSON shape (camelCase, nulls left out).
+- `Store/EventLog`: one NDJSON file per UTC day under `~/.ancos-santiye/events`. Unreadable lines are skipped and counted.
+- `Scene/`: `SiteState` (sorted immutable maps, so JSON output is stable) and `SiteReducer`, a pure fold. Unknown kinds and events missing their required data leave the state untouched.
+- `Store/SiteHub`: log first, then reducer, then live subscribers. Snapshot and subscription are taken under one lock. A slow subscriber drops its oldest events.
+- `SiteApp`: `/health`, `/state`, `/events` (SSE via `TypedResults.ServerSentEvents`: one `snapshot`, then `event` items). Today's log is replayed at start.
+- 20 tests, including an end to end test that starts the real server on a free loopback port and reads the SSE stream. No test host package.
+- Mutation checks, all caught: the reducer reading the clock (2 tests failed), a public default URL (1), no data trimming (1).
+- `check.sh` falls back to `dotnet.exe` so it also runs from WSL bash.
+
 ## Problems
 
 | Problem | Cause | Fix |

@@ -15,5 +15,12 @@ if grep -rn --include=*.cs --include=*.js --include=*.html --include=*.css --inc
   exit 1
 fi
 
-dotnet build --nologo -v q
-dotnet test --nologo -v q --no-build
+# From WSL, the Windows SDK is reachable only as dotnet.exe.
+dotnet="$(command -v dotnet || command -v dotnet.exe || true)"
+if [ -z "$dotnet" ]; then
+  echo "dotnet not found. Install the .NET 10 SDK, then open a new terminal."
+  exit 1
+fi
+
+"$dotnet" build --nologo -v q
+"$dotnet" test --nologo -v q --no-build
