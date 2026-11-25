@@ -15,10 +15,12 @@ public static class SiteReducer
     {
         var next = e.Kind switch
         {
-            EventKinds.SessionStart or EventKinds.AgentStart or EventKinds.TurnStop or EventKinds.ToolEnd
-                => SetActor(state, e, Activities.Idle, tool: null),
-            EventKinds.ToolStart => SetActor(state, e, Activities.Working, Value(e, "tool")),
-            EventKinds.ToolFail => SetActor(state, e, Activities.Failed, Value(e, "tool")),
+            EventKinds.SessionStart or EventKinds.AgentStart => SetActor(state, e, Activities.Idle, tool: null, Saying.Starting),
+            EventKinds.TurnStop => SetActor(state, e, Activities.Idle, tool: null, Saying.Waiting),
+            // The bubble keeps the last action between two tools, so it does not flicker.
+            EventKinds.ToolEnd => SetActor(state, e, Activities.Idle, tool: null, state.Actors.GetValueOrDefault(e.Actor.Id)?.Say),
+            EventKinds.ToolStart => SetActor(state, e, Activities.Working, Value(e, "tool"), Value(e, "say") ?? UsingTool(e)),
+            EventKinds.ToolFail => SetActor(state, e, Activities.Failed, Value(e, "tool"), "Failed: " + (Value(e, "say") ?? UsingTool(e))),
             EventKinds.SessionEnd or EventKinds.AgentStop => state with { Actors = state.Actors.Remove(e.Actor.Id) },
             EventKinds.TaskCreated => state with { TasksPlanned = state.TasksPlanned + 1 },
             EventKinds.TaskCompleted => state with { TasksDone = state.TasksDone + 1 },
@@ -38,9 +40,11 @@ public static class SiteReducer
         return next is null ? state : next with { Version = state.Version + 1 };
     }
 
-    private static SiteState SetActor(SiteState state, SiteEvent e, string activity, string? tool)
+    private static string UsingTool(SiteEvent e) => $"Using {Value(e, "tool") ?? "a tool"}";
+
+    private static SiteState SetActor(SiteState state, SiteEvent e, string activity, string? tool, string? say)
     {
-        var actor = new ActorState(e.Actor.Id, e.Actor.Role, e.Actor.Name, activity, tool, e.Ts);
+        var actor = new ActorState(e.Actor.Id, e.Actor.Role, e.Actor.Name, activity, tool, e.Ts, say);
         return state with { Actors = state.Actors.SetItem(actor.Id, actor) };
     }
 

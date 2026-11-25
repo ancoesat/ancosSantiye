@@ -107,4 +107,30 @@ public class SiteReducerTests
         Assert.Same(before, SiteReducer.Reduce(before, Ev.At(11, EventKinds.PieceStatus, data: ("status", "bitti"))));
         Assert.Same(before, SiteReducer.Reduce(before, Ev.At(12, EventKinds.GatePending)));
     }
+
+    private static string? SayAfter(params SiteEvent[] events) => SiteReducer.Replay(events).Actors["chief"].Say;
+
+    [Fact]
+    public void Bubble_FollowsWhatTheActorDoes()
+    {
+        Assert.Equal(Saying.Starting, SayAfter(Ev.At(0, EventKinds.SessionStart)));
+        Assert.Equal("Reading a.cs", SayAfter(Ev.At(0, EventKinds.ToolStart, data: [("tool", "Read"), ("say", "Reading a.cs")])));
+        Assert.Equal("Using Read", SayAfter(Ev.At(0, EventKinds.ToolStart, data: ("tool", "Read"))));
+        Assert.Equal("Failed: Run tests", SayAfter(Ev.At(0, EventKinds.ToolFail, data: [("tool", "Bash"), ("say", "Run tests")])));
+        Assert.Equal(Saying.Waiting, SayAfter(
+            Ev.At(0, EventKinds.ToolStart, data: [("tool", "Read"), ("say", "Reading a.cs")]),
+            Ev.At(1, EventKinds.TurnStop)));
+    }
+
+    [Fact]
+    public void Bubble_KeepsTheLastActionBetweenTools()
+    {
+        var state = SiteReducer.Replay([
+            Ev.At(0, EventKinds.ToolStart, data: [("tool", "Read"), ("say", "Reading a.cs")]),
+            Ev.At(1, EventKinds.ToolEnd, data: ("tool", "Read")),
+        ]);
+
+        Assert.Equal("Reading a.cs", state.Actors["chief"].Say);
+        Assert.Equal(Activities.Idle, state.Actors["chief"].Activity);
+    }
 }

@@ -123,8 +123,15 @@ export class Cast {
     }
   }
 
-  // Positions for the name tags, in scene pixels (feet position).
+  // Positions for the name tags and speech bubbles, in scene pixels (feet position).
   tags() {
-    return [...this.members.values()].map((m) => ({ id: m.actor.id, label: m.actor.name ?? m.actor.role, x: m.x, y: m.y }));
+    return [...this.members.values()].map((m) => ({
+      id: m.actor.id,
+      label: m.actor.name ?? m.actor.role,
+      say: m.actor.say ?? null,
+      activity: m.actor.activity,
+      x: m.x,
+      y: m.y,
+    }));
   }
 }

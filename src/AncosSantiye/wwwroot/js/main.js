@@ -152,7 +152,8 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-// Name tags live in HTML over the canvas, so text stays sharp at any scale.
+// Name tags and speech bubbles live in HTML over the canvas, so text stays sharp at any scale.
+// The bubble says what the worker is doing; text goes in with textContent only.
 function drawTags() {
   const tags = cast.tags();
   const seen = new Set();
@@ -160,16 +161,41 @@ function drawTags() {
     seen.add(tag.id);
     let el = tagLayer.querySelector(`[data-id="${CSS.escape(tag.id)}"]`);
     if (!el) {
-      el = document.createElement("span");
+      el = document.createElement("div");
       el.className = "tag";
       el.dataset.id = tag.id;
+      el.append(document.createElement("span"), document.createElement("span"));
+      el.children[0].className = "say";
+      el.children[1].className = "name";
       tagLayer.append(el);
     }
-    el.textContent = tag.label;
+    const [say, name] = el.children;
+    say.textContent = tag.say ?? "";
+    say.hidden = !tag.say;
+    say.classList.toggle("failed", tag.activity === "failed");
+    say.classList.toggle("waiting", tag.say === "Waiting for you");
+    name.textContent = tag.label;
     el.style.left = `${tag.x * scale}px`;
-    el.style.top = `${(tag.y - 36) * scale}px`;
+    el.style.top = `${(tag.y - 36) * scale + 15}px`;
   }
   for (const el of [...tagLayer.children]) {
     if (!seen.has(el.dataset.id)) el.remove();
+  }
+  stackBubbles(tags);
+}
+
+// Workers standing close would cover each other's bubbles. Left to right, each bubble takes
+// the lowest row where it does not touch the one before it in that row.
+function stackBubbles(tags) {
+  const rows = [];
+  for (const tag of [...tags].sort((a, b) => a.x - b.x)) {
+    const say = tagLayer.querySelector(`[data-id="${CSS.escape(tag.id)}"] .say`);
+    if (!say || say.hidden) continue;
+    const width = say.offsetWidth;
+    const left = tag.x * scale - width / 2;
+    let row = rows.findIndex((right) => left > right + 4);
+    if (row === -1) row = rows.push(0) - 1;
+    rows[row] = left + width;
+    say.style.marginBottom = `${row * 22}px`;
   }
 }

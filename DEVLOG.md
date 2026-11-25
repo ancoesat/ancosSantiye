@@ -100,6 +100,14 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Claude checked: `check.sh` green (197 tests). `dotnet pack -c Release`, then `dotnet tool install` into a temp tool path and started from an unrelated folder: `--help`, `hooks print`, the page, `js/main.js`, `js/actions.js`, `/skin/skin.json`, a sprite, `/config`, `/state` all 200; `statusline` printed `santiye http://127.0.0.1:5170 | ctx 12%`; demo rendered with no console errors.
 - Release is Esat's: tag, GitHub Release with the `.nupkg`. nuget.org is optional and needs his API key.
 
+## 2026-11-26 v0.2 #1: workers talk
+
+- Why v0.2: in the first real use (rovans in the desktop app, KBYTE) the site showed activity but said nothing. Workers walked in circles, the building only grew from the orchestra status file, the right panel mixed projects and Budget had no data outside a terminal session. Esat's verdict: manual, not informative, misleading. The direction he approved: a site that tells the truth, in this order: talking workers, one project at a time, progress from the session's task list, animation that matches the action, honest Budget, cleanup.
+- `ClaudeHookMapper.Say`: one line per tool start or failure ("Reading SPEC.md", "Run the unit tests", "Calling Explore", "Using github"), at most 60 characters. Reads only the file name (never the folders), the agent's own description, a subagent or skill name, a URL host. Rule 4 in CLAUDE.md now says exactly this.
+- Reducer: `ActorState.Say`. Start says "Getting started", a stop says "Waiting for you", a failure says "Failed: ...", and the line stays between two tools so it does not flicker.
+- Front: a speech bubble above each name tag (white, yellow when waiting for you, red on failure). Bubbles of workers standing close stack in rows instead of covering each other.
+- Claude checked: `check.sh` green (222 tests). 8 mutations caught (full path, command, first line only, length cap, say only on start and fail, URL host only, line kept between tools, waiting line). Live test with real hook payloads (a Bash command with a secret, a Grep pattern): the state carries only the bubble lines. Headless Chrome: live and demo, no console errors.
+
 ## Problems
 
 | Problem | Cause | Fix |

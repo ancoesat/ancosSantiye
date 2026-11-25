@@ -10,13 +10,21 @@ public static class Activities
     public const string Failed = "failed";
 }
 
+/// <summary>Bubble lines the reducer sets itself; tool lines come from the adapter.</summary>
+public static class Saying
+{
+    public const string Starting = "Getting started";
+    public const string Waiting = "Waiting for you";
+}
+
 public sealed record ActorState(
     string Id,
     string Role,
     string? Name,
     string Activity,
     string? Tool,
-    DateTimeOffset LastSeen);
+    DateTimeOffset LastSeen,
+    string? Say = null);
 
 public sealed record PieceState(string Id, string Status, string? Verdict, DateTimeOffset Updated);
 

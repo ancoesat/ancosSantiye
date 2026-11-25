@@ -51,7 +51,7 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 1. Loopback only. The server binds to 127.0.0.1. Nothing listens on a public interface.
 2. No NuGet packages in `src/`. Framework and standard library only. The test project may use xUnit.
 3. No build step for the front end. No npm, no bundler.
-4. Events never carry code, diffs, file contents or secrets. Only names, ids, counts, statuses.
+4. Events never carry code, diffs, file contents or secrets. Only names, ids, counts, statuses. The speech bubble (`ClaudeHookMapper.Say`) may read exactly these parts of `tool_input`: the last segment of a file path, the agent's own `description`, a subagent or skill name, a URL's host. Never a command, pattern, query, prompt or full path; every one of those has a test.
 5. The reducer in `Scene/` is pure: same events in, same state out. All I/O stays in adapters and the store.
 6. Actions (commit, push) exist only behind `actions.enabled`. When it is false the endpoints are not mapped at all. The page sends a repo index, never a path; every file must be in the server's own `git status`; push is a plain `git push` to `@{push}`, never with arguments. Each request needs the server's own Origin, JSON and the per-start token.
    Known limit: a local program can read the token from `/config` like the page does. The agent deny list (`siyametrik-skills/claude-code/settings-ornek.json`) blocks `/actions/` and `/config` on localhost; keep actions off when you do not need them.
