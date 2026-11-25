@@ -111,6 +111,7 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 | Removing `GIT_LITERAL_PATHSPECS` passed all tests | git reads a name literally when that file exists, so the bracket test could not see it | New test: commit a deleted `[ab].txt`; without the flag git also staged `a.txt` |
 | `@{push}` replaced by `@{u}` passed | In the test both pointed at the same branch | New test with `remote.pushDefault`: under `push.default=simple` git cannot name `@{push}`, so the screen refuses; with `current` it pushes to `backup/main` |
 | My F6 DEVLOG edit dropped the `## Problems` heading | A text replace swapped the heading out and did not put it back | Restored in F7 |
+| A second `ancos-santiye` printed a long Kestrel stack trace (found by Esat while trying the package) | The port was held by an earlier `dotnet run`; Kestrel only fails at bind time | Start checks every port first and stops with one line that says to open the running one |
 | `dotnet pack` made no package | The Web SDK sets `IsPackable` to false | `<IsPackable>true</IsPackable>` |
 | Precompressed files still in the package after `CompressionEnabled` was set to false | A stale `obj/Release` from the earlier pack | Delete `obj/Release` before packing (in Lessons) |
 | A mutation of the first-tick skip passed | The test read the state version after the first tick, so it could not see events published during that tick | The test asserts version 0 after the first tick |

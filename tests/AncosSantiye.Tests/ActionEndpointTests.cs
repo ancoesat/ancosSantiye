@@ -153,6 +153,25 @@ public sealed class ActionEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public void ABusyPort_StopsTheServerWithOneLine()
+    {
+        var holder = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        holder.Start();
+        try
+        {
+            var port = ((System.Net.IPEndPoint)holder.LocalEndpoint).Port;
+
+            var ex = Assert.Throws<SiteApp.SetupException>(() => SiteApp.Build([], _data, $"http://127.0.0.1:{port}", new Profile()));
+
+            Assert.Contains($"Port {port} is already in use", ex.Message);
+        }
+        finally
+        {
+            holder.Stop();
+        }
+    }
+
+    [Fact]
     public async Task WrongToken_IsRefused()
     {
         await Start(enabled: true);

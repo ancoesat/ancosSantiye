@@ -35,6 +35,13 @@ public static class SiteApp
             {
                 throw new SetupException($"Only loopback addresses are allowed (127.0.0.1, localhost): {url}");
             }
+
+            if (uri.Port != 0 && PortInUse(uri.Port))
+            {
+                throw new SetupException(
+                    $"Port {uri.Port} is already in use. If ancos-santiye is already running, just open http://127.0.0.1:{uri.Port}. " +
+                    "Otherwise stop the program that holds the port.");
+            }
         }
 
         builder.WebHost.UseUrls(serverUrls);
@@ -155,6 +162,25 @@ public static class SiteApp
         });
 
         return app;
+    }
+
+    /// <summary>A one line answer instead of Kestrel's stack trace when a second copy starts.</summary>
+    private static bool PortInUse(int port)
+    {
+        var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port) { ExclusiveAddressUse = OperatingSystem.IsWindows() };
+        try
+        {
+            probe.Start();
+            return false;
+        }
+        catch (System.Net.Sockets.SocketException ex) when (ex.SocketErrorCode == System.Net.Sockets.SocketError.AddressAlreadyInUse)
+        {
+            return true;
+        }
+        finally
+        {
+            probe.Stop();
+        }
     }
 
     private sealed record RepoRequest(int Repo);
