@@ -123,7 +123,7 @@ What it will and will not do:
 
 How it is guarded: the endpoints do not exist unless actions are on. Every request must come from the page's own origin, be JSON, and carry a random token made at every start. A page on another site cannot get through (the custom header forces a CORS preflight that the server never answers), and a foreign `Host` header is refused, which stops DNS rebinding.
 
-**Known limit:** a program running on your machine can read the token the same way the page does. A program with a shell can also just run `git`, so this is no new power, but if you let AI agents run commands, keep actions off unless you need them, or deny `127.0.0.1:*/actions/*` and `127.0.0.1:*/config` in the agent's permission rules.
+**Known limit:** a program running on your machine can read the token the same way the page does. A program with a shell can also just run `git`, so this is no new power, but if you let AI agents run commands, keep actions off unless you need them, or deny them in the agent's permission rules, for Claude Code: `Bash(*127.0.0.1*/actions/*)`, `Bash(*127.0.0.1*/config*)` and the same two with `localhost`. Do not put `:*` in the middle of a rule; Claude Code warns about it on every run.
 
 ## Security and privacy
 
