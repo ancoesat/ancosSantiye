@@ -93,6 +93,13 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Opus denetçi: round 1 DÜZELT (8 findings: non-loopback `--urls`, no foreign Host test, pipes outside the time limit, temp file before the try, `@{u}` instead of `@{push}` and "up to date" counted as pushed, refused commit left files staged, confirm showed one line, check log without the check.sh run). All fixed with tests and mutations. Round 2 ONAY. Its leftovers: `[::1]` passed the URL check but not the host filter (fixed: only 127.0.0.1 and localhost); `Kestrel:Endpoints` bypass and the `MM` case went to Open items.
 - siyametrik-skills: deny list now blocks `/actions/` and `/config` on localhost; its README explains why and that it narrows, not closes, the path.
 
+## 2026-11-25 F8: package and README
+
+- `AncosSantiye.csproj`: `IsPackable` (the Web SDK turns packing off), package metadata, `README.md` in the package. The static web assets pipeline and precompression are off: the page is served by `UseStaticFiles` from the app folder, so they only added an extra copy and `.br`/`.gz` files. Skins, `wwwroot` and `appsettings.json` are marked `Pack="false"` so they live only once, under `tools/`. Package: 61 files, 250 KB (was 183 files).
+- `README.md`: what it is, install, quick start, profiles, folder lane, custom skins, commit and push with the known limit, security and privacy, how it is built, known gaps. Hero image `docs/hero.png` from `?demo=build` of the installed tool.
+- Claude checked: `check.sh` green (197 tests). `dotnet pack -c Release`, then `dotnet tool install` into a temp tool path and started from an unrelated folder: `--help`, `hooks print`, the page, `js/main.js`, `js/actions.js`, `/skin/skin.json`, a sprite, `/config`, `/state` all 200; `statusline` printed `santiye http://127.0.0.1:5170 | ctx 12%`; demo rendered with no console errors.
+- Release is Esat's: tag, GitHub Release with the `.nupkg`. nuget.org is optional and needs his API key.
+
 ## Problems
 
 | Problem | Cause | Fix |
@@ -104,6 +111,8 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 | Removing `GIT_LITERAL_PATHSPECS` passed all tests | git reads a name literally when that file exists, so the bracket test could not see it | New test: commit a deleted `[ab].txt`; without the flag git also staged `a.txt` |
 | `@{push}` replaced by `@{u}` passed | In the test both pointed at the same branch | New test with `remote.pushDefault`: under `push.default=simple` git cannot name `@{push}`, so the screen refuses; with `current` it pushes to `backup/main` |
 | My F6 DEVLOG edit dropped the `## Problems` heading | A text replace swapped the heading out and did not put it back | Restored in F7 |
+| `dotnet pack` made no package | The Web SDK sets `IsPackable` to false | `<IsPackable>true</IsPackable>` |
+| Precompressed files still in the package after `CompressionEnabled` was set to false | A stale `obj/Release` from the earlier pack | Delete `obj/Release` before packing (in Lessons) |
 | A mutation of the first-tick skip passed | The test read the state version after the first tick, so it could not see events published during that tick | The test asserts version 0 after the first tick |
 | `dotnet run` listened on `localhost:5087`, not `127.0.0.1:5170` | The template's `launchSettings.json` sets the URL, so the code default was skipped | Deleted `launchSettings.json` |
 

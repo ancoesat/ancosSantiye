@@ -6,3 +6,4 @@ obj/
 TestResults/
 _assets/
 .DS_Store
+artifacts/

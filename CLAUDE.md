@@ -42,7 +42,8 @@ Planning docs (R1, R2, R3): https://claude.ai/artifact/78unfekyyMxxhwxRZgeu1o
 ```bash
 bash scripts/check.sh                      # the gate, must be green
 dotnet run --project src/AncosSantiye      # http://127.0.0.1:5170
-dotnet pack src/AncosSantiye -o artifacts  # the dotnet tool package
+dotnet pack src/AncosSantiye -c Release -o artifacts  # the dotnet tool package
+dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (uninstall: dotnet tool uninstall -g AncosSantiye)
 ```
 
 ## Rules
@@ -65,6 +66,7 @@ dotnet pack src/AncosSantiye -o artifacts  # the dotnet tool package
 - A command that writes a user's config accepts exact argument shapes only. A typo must never fall back to the real file. (F2 review.)
 - Settings files are refused, not repaired, when the parts we touch have an unexpected shape, comments or duplicate keys. Always back up before writing.
 - Do not add `Properties/launchSettings.json`. It overrides the loopback default URL.
+- Before packing, delete `src/AncosSantiye/obj/Release`: a stale obj kept precompressed `.br`/`.gz` files in the package after compression was turned off. (F8.)
 - An Origin check against `request.Host` is only as good as the host filter in front of it. Test the filter with a foreign Host and a matching Origin. (F7 review.)
 - `@{u}` is not always where `git push` goes; `@{push}` is. If git cannot name it, do not push. (F7 review.)
 - A time limit on a child process must cover reading its pipes too, not only waiting for exit. (F7 review.)
@@ -74,7 +76,6 @@ dotnet pack src/AncosSantiye -o artifacts  # the dotnet tool package
 - Delivery ids (`project-NNN`) and status file ids are separate id spaces; a delivery shows as its own piece.
 - A `Kestrel:Endpoints` setting (appsettings or `Kestrel__Endpoints__*` env) overrides `UseUrls` and skips the loopback check. Close it by checking the real bound addresses after start.
 - A refused commit of a partly staged file (`MM`) leaves its whole working copy staged, and the message does not say so.
-- README (F8) must carry the actions known limit from Rule 6.
 - Hooks and the status line always target port 5170, even when `--urls` changes the server port.
 - Request bodies are not size capped beyond Kestrel's default (loopback only, so low risk).
 - On Esat's Windows machine `bash` resolves to WSL, where .NET is not installed. `check.sh` now falls back to `dotnet.exe`; confirm `bash scripts/check.sh` works from PowerShell. If not, point `bash` at Git Bash.

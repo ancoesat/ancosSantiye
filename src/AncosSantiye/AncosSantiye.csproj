@@ -5,7 +5,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AncosSantiye</RootNamespace>
+    <IsPackable>true</IsPackable>
     <PackAsTool>true</PackAsTool>
+    <!-- A tool runs from tools/ in the package. The page is served by UseStaticFiles from the app folder,
+         so the static web assets pipeline (an extra copy plus precompressed files) is not needed. -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+    <CompressionEnabled>false</CompressionEnabled>
     <ToolCommandName>ancos-santiye</ToolCommandName>
     <!-- dotnet run starts in the project folder by default; start where the user is, like the installed tool. -->
     <RunWorkingDirectory>$(MSBuildStartupDirectory)</RunWorkingDirectory>
@@ -14,13 +19,18 @@
     <Authors>Mehmet Esat Comlekci</Authors>
     <Description>Watch your AI coding agents build your project as a pixel art construction site.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>claude-code;ai-agents;dashboard;pixel-art;dotnet-tool</PackageTags>
+    <RepositoryUrl>https://github.com/ancoesat/ancosSantiye</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ancoesat/ancosSantiye</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- The Web SDK already picks up skin.json; remove it first so every skin file is listed once. -->
     <Content Remove="skins/**" />
-    <Content Include="skins/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="skins/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <Content Update="wwwroot/**;appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>
