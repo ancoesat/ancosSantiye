@@ -73,6 +73,11 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 
 ## Open items
 
+- Found in the first real use (2026-11-26):
+  - Budget only fills from an interactive terminal `claude` session. The desktop app's Code tab and `claude -p` never run the status line, and hooks carry no usage data.
+  - Workers from sessions that ended without `session.end` (app closed, login expired) stay idle on the site forever. Needs a timeout.
+  - The day's log replay brings back folder lane gates from a project the current profile no longer watches (santiye-f8 stayed "waiting" under the kbyte profile). Needs scoping by profile, or a way to clear.
+
 - Delivery ids (`project-NNN`) and status file ids are separate id spaces; a delivery shows as its own piece.
 - A `Kestrel:Endpoints` setting (appsettings or `Kestrel__Endpoints__*` env) overrides `UseUrls` and skips the loopback check. Close it by checking the real bound addresses after start.
 - A refused commit of a partly staged file (`MM`) leaves its whole working copy staged, and the message does not say so.
