@@ -100,6 +100,7 @@ export function demoState(name) {
       },
       tasksPlanned: 10,
       tasksDone: 6,
+      currentTask: "Wire the panels to live data",
       usage,
     },
     done: {

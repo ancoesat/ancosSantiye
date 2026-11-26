@@ -161,4 +161,29 @@ public class ClaudeHookMapperTests
     {
         Assert.Equal(expected, ClaudeHookMapper.ProjectName(cwd));
     }
+
+    [Fact]
+    public void TaskHooks_CarryTheIdAndTitle_NeverTheDescription()
+    {
+        var created = Map("""
+            { "session_id": "s", "cwd": "/x/p", "hook_event_name": "TaskCreated", "task_id": "task-001",
+              "task_subject": "Implement user authentication", "task_description": "SECRET plan details" }
+            """)!;
+        var done = Map("""{ "session_id": "s", "cwd": "/x/p", "hook_event_name": "TaskCompleted", "task_id": "task-001" }""")!;
+
+        Assert.Equal(EventKinds.TaskCreated, created.Kind);
+        Assert.Equal("task-001", created.Data!["task"]);
+        Assert.Equal("Implement user authentication", created.Data["subject"]);
+        Assert.DoesNotContain("SECRET", JsonSerializer.Serialize(created, EventJson.Options));
+        Assert.Equal("task-001", done.Data!["task"]);
+        Assert.False(done.Data.ContainsKey("subject"));
+    }
+
+    [Fact]
+    public void TaskTitle_IsShort()
+    {
+        var e = Map($$"""{ "hook_event_name": "TaskCreated", "task_id": "t", "task_subject": "{{new string('x', 200)}}" }""")!;
+
+        Assert.Equal(ClaudeHookMapper.MaxSay, e.Data!["subject"].Length);
+    }
 }

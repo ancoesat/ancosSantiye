@@ -133,4 +133,82 @@ public class SiteReducerTests
         Assert.Equal("Reading a.cs", state.Actors["chief"].Say);
         Assert.Equal(Activities.Idle, state.Actors["chief"].Activity);
     }
+
+    private static SiteEvent Task(int second, string kind, string session, string id, string? subject = null)
+    {
+        var data = subject is null
+            ? new Dictionary<string, string> { ["task"] = id }
+            : new Dictionary<string, string> { ["task"] = id, ["subject"] = subject };
+        return SiteEvent.Create(Sources.ClaudeCode, "demo", Ev.Chief, kind, session: session, data: data,
+            ts: new DateTimeOffset(2026, 11, 26, 10, 0, second, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void Tasks_CountOnceEvenIfTheHookRepeats()
+    {
+        var s = SiteReducer.Replay([
+            Task(0, EventKinds.TaskCreated, "a", "1", "Map the code"),
+            Task(1, EventKinds.TaskCreated, "a", "1", "Map the code"),
+            Task(2, EventKinds.TaskCreated, "a", "2", "Write tests"),
+            Task(3, EventKinds.TaskCompleted, "a", "1"),
+            Task(4, EventKinds.TaskCompleted, "a", "1"),
+            Task(5, EventKinds.TaskCreated, "a", "1", "Map the code"),
+        ]);
+
+        Assert.Equal((2, 1), (s.TasksPlanned, s.TasksDone));
+        Assert.Equal("Write tests", s.CurrentTask);
+    }
+
+    [Fact]
+    public void Tasks_TheNewestListCounts_NotAnOldFinishedOne()
+    {
+        var s = SiteReducer.Replay([
+            Task(0, EventKinds.TaskCreated, "old", "1", "Old work"),
+            Task(1, EventKinds.TaskCompleted, "old", "1"),
+            Task(5, EventKinds.TaskCreated, "new", "1", "Plan"),
+            Task(6, EventKinds.TaskCreated, "new", "2", "Build"),
+        ]);
+
+        Assert.Equal((2, 0), (s.TasksPlanned, s.TasksDone));
+        Assert.Equal("Plan", s.CurrentTask);
+        Assert.Equal(3, s.Tasks.Count);
+    }
+
+    [Fact]
+    public void Tasks_FollowOrderOfCreation_AndAllDoneHasNoCurrentTask()
+    {
+        var s = SiteReducer.Replay([
+            Task(0, EventKinds.TaskCreated, "a", "b", "First"),
+            Task(1, EventKinds.TaskCreated, "a", "a", "Second"),
+        ]);
+
+        Assert.Equal("First", s.CurrentTask);
+
+        s = SiteReducer.Reduce(s, Task(2, EventKinds.TaskCompleted, "a", "b"));
+
+        Assert.Equal("Second", s.CurrentTask);
+
+        s = SiteReducer.Reduce(s, Task(3, EventKinds.TaskCompleted, "a", "a"));
+
+        Assert.Equal((2, 2), (s.TasksPlanned, s.TasksDone));
+        Assert.Null(s.CurrentTask);
+    }
+
+    [Fact]
+    public void Tasks_ACompletionWeNeverSawCreated_StillCounts()
+    {
+        var s = SiteReducer.Replay([Task(0, EventKinds.TaskCompleted, "a", "9", "Late")]);
+
+        Assert.Equal((1, 1), (s.TasksPlanned, s.TasksDone));
+    }
+
+    [Fact]
+    public void Tasks_TheirCountsReachThePage()
+    {
+        var json = Json(SiteReducer.Replay([Task(0, EventKinds.TaskCreated, "a", "1", "Plan")]));
+
+        Assert.Contains("\"tasksPlanned\":1", json);
+        Assert.Contains("\"tasksDone\":0", json);
+        Assert.Contains("\"currentTask\":\"Plan\"", json);
+    }
 }

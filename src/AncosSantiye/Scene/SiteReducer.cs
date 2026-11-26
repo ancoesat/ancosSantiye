@@ -22,8 +22,8 @@ public static class SiteReducer
             EventKinds.ToolStart => SetActor(state, e, Activities.Working, Value(e, "tool"), Value(e, "say") ?? UsingTool(e)),
             EventKinds.ToolFail => SetActor(state, e, Activities.Failed, Value(e, "tool"), "Failed: " + (Value(e, "say") ?? UsingTool(e))),
             EventKinds.SessionEnd or EventKinds.AgentStop => state with { Actors = state.Actors.Remove(e.Actor.Id) },
-            EventKinds.TaskCreated => state with { TasksPlanned = state.TasksPlanned + 1 },
-            EventKinds.TaskCompleted => state with { TasksDone = state.TasksDone + 1 },
+            EventKinds.TaskCreated => AddTask(state, e),
+            EventKinds.TaskCompleted => CompleteTask(state, e),
             EventKinds.StageChanged when Value(e, "stage") is { } stage => state with { Stage = stage },
             EventKinds.PieceStatus when e.Piece is not null && Value(e, "status") is { } status
                 => SetPiece(state, e.Piece, e.Ts, status, verdict: null),
@@ -46,6 +46,42 @@ public static class SiteReducer
     {
         var actor = new ActorState(e.Actor.Id, e.Actor.Role, e.Actor.Name, activity, tool, e.Ts, say);
         return state with { Actors = state.Actors.SetItem(actor.Id, actor) };
+    }
+
+    // Tasks are keyed by session and task id, so a repeated hook never counts a task twice.
+    private static string TaskKey(SiteEvent e, string id) => $"{e.Session ?? ""}/{id}";
+
+    private static SiteState AddTask(SiteState state, SiteEvent e)
+    {
+        var id = Value(e, "task") ?? e.Id.ToString();
+        var key = TaskKey(e, id);
+        if (state.Tasks.ContainsKey(key))
+        {
+            return state;
+        }
+
+        var task = new TaskState(id, e.Session ?? "", Value(e, "subject"), Done: false, e.Ts, e.Ts);
+        return state with { Tasks = state.Tasks.SetItem(key, task) };
+    }
+
+    private static SiteState CompleteTask(SiteState state, SiteEvent e)
+    {
+        // Without an id (older hooks), the oldest open task of the session is the one that got done.
+        var key = Value(e, "task") is { } id
+            ? TaskKey(e, id)
+            : state.Tasks.Where(t => t.Value.Session == (e.Session ?? "") && !t.Value.Done)
+                .OrderBy(t => t.Value.Created).Select(t => t.Key).FirstOrDefault();
+
+        if (key is null)
+        {
+            return state;
+        }
+
+        var old = state.Tasks.GetValueOrDefault(key);
+        var task = old is null
+            ? new TaskState(Value(e, "task") ?? e.Id.ToString(), e.Session ?? "", Value(e, "subject"), Done: true, e.Ts, e.Ts)
+            : old with { Done = true, Subject = old.Subject ?? Value(e, "subject"), Updated = e.Ts };
+        return state with { Tasks = state.Tasks.SetItem(key, task) };
     }
 
     private static SiteState SetPiece(SiteState state, string id, DateTimeOffset at, string? status, string? verdict)

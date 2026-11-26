@@ -11,6 +11,8 @@ It runs on your machine only: a small .NET server on `127.0.0.1` and one page in
 ## What you get
 
 - **The site:** a chief, workers, a subcontractor, an inspector, an architect and a supplier truck, each tied to a real agent role. Workers climb to the roof while they work, wait on the ground when idle, and walk off when their session ends.
+- **Speech bubbles:** each worker says what it is doing right now ("Reading SPEC.md", "Run the unit tests", "Waiting for you").
+- **Progress from the task list:** when Claude Code keeps a task list, the header shows "2 of 4 tasks done / now: ...", each task is a block on the building, and the side panel lists the tasks. Without a task list (or an orchestra status file) there is no building: nothing is pretended.
 - **Side panels:** what is waiting for you, every piece and its status, your context window and plan limits (5 hour and 7 day), and the last events.
 - **Notifications:** one beep and one browser notification per new gate, never on page load.
 - **Folder lane (optional):** watch a folder with a markdown status file and delivery files, so work done outside Claude Code (other models, other tools, you) shows up too.

@@ -41,6 +41,21 @@ public static class ClaudeHookMapper
 
         var tool = Text(hook, "tool_name");
         Dictionary<string, string>? data = null;
+        if (kind is EventKinds.TaskCreated or EventKinds.TaskCompleted)
+        {
+            // The task's id and the agent's own short title for it; never its description.
+            data = new Dictionary<string, string>();
+            if (Text(hook, "task_id") is { } taskId)
+            {
+                data["task"] = taskId;
+            }
+
+            if (Short(Text(hook, "task_subject")) is { } subject)
+            {
+                data["subject"] = subject.Length <= MaxSay ? subject : subject[..(MaxSay - 3)] + "...";
+            }
+        }
+
         if (tool is not null)
         {
             data = new Dictionary<string, string> { ["tool"] = tool };

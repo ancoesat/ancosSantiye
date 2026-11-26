@@ -129,11 +129,16 @@ function waitingSection(gates, now) {
 }
 
 function piecesSection(site, pieces) {
-  const node = section("Pieces");
-  const stage = isMissing(site.stage) ? "no stage" : String(site.stage);
   const planned = Math.max(0, Math.floor(Number(site.tasksPlanned) || 0));
   const done = Math.max(0, Math.floor(Number(site.tasksDone) || 0));
-  node.append(make("p", "meta", planned > 0 ? `${stage}, ${done} / ${planned} tasks` : stage));
+
+  // A plain session has no pieces, only its task list: then the task list is what this panel shows.
+  if (Object.keys(pieces).length === 0 && planned > 0) return tasksSection(site, done, planned);
+
+  const node = section("Pieces");
+  const stage = isMissing(site.stage) ? null : String(site.stage);
+  const meta = [stage, planned > 0 ? `${done} / ${planned} tasks` : null].filter(Boolean).join(", ");
+  if (meta) node.append(make("p", "meta", meta));
 
   const rows = Object.entries(pieces)
     .map(([key, piece]) => ({ key, piece: piece && typeof piece === "object" ? piece : {} }))
@@ -158,6 +163,22 @@ function piecesSection(site, pieces) {
     node.append(row);
   }
 
+  return node;
+}
+
+function tasksSection(site, done, planned) {
+  const node = section("Tasks");
+  node.append(make("p", "meta", `${done} of ${planned} done`));
+  const tasks = Array.isArray(site.currentTasks) ? site.currentTasks : [];
+  const open = tasks.find((task) => task && !task.done);
+  for (const task of tasks) {
+    if (!task || typeof task !== "object") continue;
+    const row = make("div", "row");
+    row.append(make("span", `dot ${task.done ? "solid" : task === open ? "half" : "planned"}`));
+    row.append(make("span", "row-main", isMissing(task.subject) ? String(task.id ?? "") : String(task.subject)));
+    row.append(make("span", "row-sub", task.done ? "done" : task === open ? "now" : ""));
+    node.append(row);
+  }
   return node;
 }
 

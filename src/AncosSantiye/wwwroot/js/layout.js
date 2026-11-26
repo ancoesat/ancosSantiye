@@ -66,6 +66,12 @@ export function buildingFrom(state) {
 
   model.phase = phaseOf(state.stage);
 
+  // No orchestra stage: the session's own task list is the progress. Open tasks mean building,
+  // a fully done list means a finished building. No tasks means no building: nothing is pretended.
+  const planned = Math.max(0, Math.floor(Number(state.tasksPlanned) || 0));
+  const done = Math.max(0, Math.floor(Number(state.tasksDone) || 0));
+  if (model.phase === "empty" && planned > 0) model.phase = done >= planned ? "done" : "building";
+
   const pieces = state.pieces && typeof state.pieces === "object" ? state.pieces : {};
   const hasPieces = Object.keys(pieces).length > 0;
   const slots = hasPieces

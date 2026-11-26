@@ -50,10 +50,15 @@ function pushEvent(event) {
   if (feed.length > 20) feed.shift();
 }
 
+// The header says how far the work is and what it is about right now.
 function drawHeader() {
   const parts = [];
   if (demoMode && current) parts.push(current);
   if (state && state.stage) parts.push(String(state.stage));
+  const planned = Math.max(0, Math.floor(Number(state?.tasksPlanned) || 0));
+  const done = Math.max(0, Math.floor(Number(state?.tasksDone) || 0));
+  if (planned > 0) parts.push(`${done} of ${planned} tasks done`);
+  if (state && typeof state.currentTask === "string" && state.currentTask) parts.push(`now: ${state.currentTask}`);
   projectLabel.textContent = parts.join(" / ");
 }
 

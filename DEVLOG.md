@@ -115,6 +115,13 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Page: a project picker in the header. Default is "follow latest": the page switches to whichever project acted last and clears the scene at once (people of another project do not walk off, they were never there). Picking a project pins it in the address. Alerts come from the gates of every project; a gate elsewhere is labeled with its project name.
 - Claude checked: `check.sh` green (231 tests). 6 mutations caught (case-blind names, latest is default, a late older event does not push a project back, subscribe to one project, `/state?project`, one worker per session); the late-event one survived first and got its own test. Headless Chrome with hooks from three sessions in two projects: follow mode switched to KBYTE when it acted and showed only its worker; pinned to rovans it kept rovans' two workers while KBYTE acted. No console errors.
 
+## 2026-11-26 v0.2 #3: progress from the session's task list
+
+- Claude Code's `TaskCreated` and `TaskCompleted` hooks carry `task_id` and `task_subject`. The mapper passes both (the title cut at 60 characters), never `task_description`.
+- Reducer: tasks are keyed by session and id, so a repeated hook never counts twice and a repeated create never reopens a done task. The task list on screen is the one of the session that touched its tasks last; an older finished list stays in the state but does not count. `TasksPlanned`, `TasksDone`, `CurrentTask` (the first open one) and `CurrentTasks` are computed from it.
+- Page: the header says "2 of 4 tasks done / now: Build match screen". Without an orchestra stage, open tasks mean "building" and a fully done list means a finished building; no tasks means no building. When a project has no pieces, the side panel shows "Tasks" with each task, done, now or open.
+- Claude checked: `check.sh` green (238 tests). 6 mutations caught; two survived first (a repeated create after completion, creation order) and got stronger tests. Headless Chrome with four real task hooks and a secret in `task_description`: header, building and task panel right, the secret nowhere in the state, no console errors.
+
 ## Problems
 
 | Problem | Cause | Fix |
