@@ -95,4 +95,19 @@ public class CliTests
             Directory.Delete(dir, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task Hook_IsSilentAndExitsZero_EvenWithNoServer()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        var code = await Cli.Run(["hook"], new StringReader("""{"hook_event_name":"SessionStart"}"""), output, error);
+
+        Assert.Equal(0, code);
+        Assert.Equal("", output.ToString() + error.ToString());
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), $"took {watch.Elapsed}");
+        Assert.False(Cli.IsServerStart(["hook"]));
+    }
 }

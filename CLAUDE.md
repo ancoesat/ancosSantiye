@@ -51,7 +51,7 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 1. Loopback only. The server binds to 127.0.0.1. Nothing listens on a public interface.
 2. No NuGet packages in `src/`. Framework and standard library only. The test project may use xUnit.
 3. No build step for the front end. No npm, no bundler.
-4. Events never carry code, diffs, file contents or secrets. Only names, ids, counts, statuses. The speech bubble (`ClaudeHookMapper.Say`) may read exactly these parts of `tool_input`: the last segment of a file path, the agent's own `description`, a subagent or skill name, a URL's host. Task hooks may carry `task_id` and `task_subject` (the agent's own short title), never `task_description`. Never a command, pattern, query, prompt or full path; every one of those has a test.
+4. Events never carry code, diffs, file contents or secrets. Only names, ids, counts, statuses. The speech bubble (`ClaudeHookMapper.Say`) may read exactly these parts of `tool_input`: the last segment of a file path, the agent's own `description`, a subagent or skill name, a URL's host. Task hooks may carry `task_id` and `task_subject` (the agent's own short title), never `task_description`. The desktop plan tool (`mcp__ccd_turn__update_plan`) may give each step's `content` and `status`, and `done`, `start`, `advance`; never a step's `session`. Never a command, pattern, query, prompt or full path; every one of those has a test.
 5. The reducer in `Scene/` is pure: same events in, same state out. All I/O stays in adapters and the store.
 6. Actions (commit, push) exist only behind `actions.enabled`. When it is false the endpoints are not mapped at all. The page sends a repo index, never a path; every file must be in the server's own `git status`; push is a plain `git push` to `@{push}`, never with arguments. Each request needs the server's own Origin, JSON and the per-start token.
    Known limit: a local program can read the token from `/config` like the page does. The agent deny list (`siyametrik-skills/claude-code/settings-ornek.json`) blocks `/actions/` and `/config` on localhost; keep actions off when you do not need them.
@@ -69,6 +69,7 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 - A test with fixed event times must use a fixed clock (`FixedClock`) for anything served through `SiteHub`. With the real clock it passes today and fails after 15 minutes of event time. (v0.2 #6.)
 - Before packing, delete `src/AncosSantiye/obj/Release`: a stale obj kept precompressed `.br`/`.gz` files in the package after compression was turned off. (F8.)
 - An Origin check against `request.Host` is only as good as the host filter in front of it. Test the filter with a foreign Host and a matching Origin. (F7 review.)
+- SessionStart runs only `command` (and `mcp_tool`) hooks; an `http` entry there never fires. Check each hook event's allowed types in the Claude Code docs before installing it. (v0.2.1, found by a read-only diagnosis run in Claude Code.)
 - `@{u}` is not always where `git push` goes; `@{push}` is. If git cannot name it, do not push. (F7 review.)
 - A time limit on a child process must cover reading its pipes too, not only waiting for exit. (F7 review.)
 

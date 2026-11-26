@@ -123,6 +123,7 @@ public static class SiteApp
         // One project at a time. Without ?project the most recently active project is used.
         app.MapGet("/projects", (SiteHub h) => TypedResults.Ok(h.Projects));
         app.MapGet("/state", (SiteHub h, string? project) => TypedResults.Ok(h.StateOf(project)));
+        app.MapGet("/activity", (SiteHub h, string? project) => TypedResults.Ok(h.RecentOf(project)));
         app.MapGet("/events", (SiteHub h, string? project, CancellationToken ct) => TypedResults.ServerSentEvents(Stream(h, project, ct)));
 
         // Claude Code hooks. Answer at once: an HTTP hook blocks Claude Code until it returns.

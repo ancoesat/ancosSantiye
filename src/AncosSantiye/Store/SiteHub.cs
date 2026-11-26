@@ -19,10 +19,26 @@ public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
 
     private const int SubscriberBuffer = 256;
 
+    /// <summary>How many recent events per project the page gets when it opens.</summary>
+    public const int RecentCount = 20;
+
     private readonly Lock _gate = new();
     private readonly List<Channel<SiteEvent>> _subscribers = [];
     private ImmutableDictionary<string, (SiteState State, DateTimeOffset LastSeen)> _projects =
         ImmutableDictionary.Create<string, (SiteState, DateTimeOffset)>(StringComparer.OrdinalIgnoreCase);
+
+    private ImmutableDictionary<string, ImmutableQueue<SiteEvent>> _recent =
+        ImmutableDictionary.Create<string, ImmutableQueue<SiteEvent>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The last events of one project (null: the latest project), oldest first.</summary>
+    public IReadOnlyList<SiteEvent> RecentOf(string? project)
+    {
+        lock (_gate)
+        {
+            var name = project ?? LatestLocked();
+            return name is not null && _recent.TryGetValue(name, out var queue) ? [.. queue] : [];
+        }
+    }
 
     /// <summary>The most recently active project's state. Empty when nothing has happened yet.</summary>
     public SiteState State => StateOf(null);
@@ -65,6 +81,7 @@ public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
         lock (_gate)
         {
             _projects = _projects.Clear();
+            _recent = _recent.Clear();
             foreach (var e in result.Events)
             {
                 if (keep is null || keep(e))
@@ -129,6 +146,14 @@ public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
         (SiteState State, DateTimeOffset LastSeen) old = _projects.TryGetValue(e.Project, out var entry) ? entry : (SiteState.Empty, DateTimeOffset.MinValue);
         var next = SiteReducer.Reduce(old.State, e);
         _projects = _projects.SetItem(e.Project, (next, e.Ts > old.LastSeen ? e.Ts : old.LastSeen));
+
+        var queue = (_recent.TryGetValue(e.Project, out var q) ? q : ImmutableQueue<SiteEvent>.Empty).Enqueue(e);
+        if (queue.Count() > RecentCount)
+        {
+            queue = queue.Dequeue();
+        }
+
+        _recent = _recent.SetItem(e.Project, queue);
     }
 
     private string? LatestLocked() =>

@@ -20,7 +20,8 @@ public static class SiteReducer
             EventKinds.TurnStop => SetActor(state, e, Activities.Idle, tool: null, Saying.Waiting, Doing.Wait),
             // Between two tools the bubble and the place stay, so nothing flickers or walks back and forth.
             EventKinds.ToolEnd => SetActor(state, e, Activities.Idle, tool: null, Previous(state, e)?.Say, Previous(state, e)?.Action),
-            EventKinds.ToolStart => SetActor(state, e, Activities.Working, Value(e, "tool"), Value(e, "say") ?? UsingTool(e), Doing.Of(Value(e, "tool"))),
+            EventKinds.ToolStart => ApplyPlan(
+                SetActor(state, e, Activities.Working, Value(e, "tool"), Value(e, "say") ?? UsingTool(e), Doing.Of(Value(e, "tool"))), e),
             EventKinds.ToolFail => SetActor(state, e, Activities.Failed, Value(e, "tool"), "Failed: " + (Value(e, "say") ?? UsingTool(e)), Doing.Fail),
             EventKinds.SessionEnd or EventKinds.AgentStop => state with { Actors = state.Actors.Remove(e.Actor.Id) },
             EventKinds.TaskCreated => AddTask(state, e),
@@ -68,6 +69,76 @@ public static class SiteReducer
         var task = new TaskState(id, e.Session ?? "", Value(e, "subject"), Done: false, e.Ts, e.Ts);
         return state with { Tasks = state.Tasks.SetItem(key, task) };
     }
+
+    /// <summary>
+    /// The desktop app's plan (see ClaudeHookMapper.AddPlan). A whole list replaces the session's plan steps;
+    /// done, start and advance change them by step number. Steps are tasks "p1".."p12" of the session.
+    /// </summary>
+    private static SiteState ApplyPlan(SiteState state, SiteEvent e)
+    {
+        if (e.Data is not { } data)
+        {
+            return state;
+        }
+
+        var session = e.Session ?? "";
+        string Key(int n) => TaskKey(e, $"p{n}");
+        var tasks = state.Tasks;
+
+        if (data.TryGetValue("planItems", out var countText) && int.TryParse(countText, out var count))
+        {
+            tasks = tasks.RemoveRange(tasks.Keys.Where(k => k.StartsWith($"{session}/p", StringComparison.Ordinal)));
+            for (var n = 1; n <= count; n++)
+            {
+                if (data.TryGetValue($"step{n}", out var step) && step.Split('|', 2) is [var status, var title])
+                {
+                    // Created moves one tick per step, so the list keeps its order.
+                    tasks = tasks.SetItem(Key(n), new TaskState(
+                        $"p{n}", session, title, Done: status == "completed", e.Ts.AddTicks(n), e.Ts, Active: status == "in_progress"));
+                }
+            }
+        }
+
+        TaskState? At(int n) => tasks.GetValueOrDefault(Key(n));
+
+        foreach (var text in (data.GetValueOrDefault("planDone") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (int.TryParse(text, out var n) && At(n) is { } t)
+            {
+                tasks = tasks.SetItem(Key(n), t with { Done = true, Active = false, Updated = e.Ts });
+            }
+        }
+
+        if (data.GetValueOrDefault("planAdvance") == "true")
+        {
+            var steps = Enumerable.Range(1, ClaudeStepLimit).Select(n => (n, t: At(n))).Where(x => x.t is not null).ToArray();
+            var active = steps.FirstOrDefault(x => x.t!.Active && !x.t.Done);
+            if (active.t is not null)
+            {
+                tasks = tasks.SetItem(Key(active.n), active.t with { Done = true, Active = false, Updated = e.Ts });
+            }
+
+            var next = steps.FirstOrDefault(x => !x.t!.Done && x.n != active.n && x.n > active.n);
+            if (next.t is not null)
+            {
+                tasks = tasks.SetItem(Key(next.n), next.t with { Active = true, Updated = e.Ts });
+            }
+        }
+
+        if (int.TryParse(data.GetValueOrDefault("planStart"), out var start) && At(start) is { } started)
+        {
+            foreach (var (key, task) in tasks.Where(t => t.Value.Session == session && t.Value.Active).ToArray())
+            {
+                tasks = tasks.SetItem(key, task with { Active = false });
+            }
+
+            tasks = tasks.SetItem(Key(start), started with { Active = true, Updated = e.Ts });
+        }
+
+        return tasks == state.Tasks ? state : state with { Tasks = tasks };
+    }
+
+    private const int ClaudeStepLimit = 12;
 
     private static SiteState CompleteTask(SiteState state, SiteEvent e)
     {

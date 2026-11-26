@@ -33,7 +33,7 @@ public sealed class HookInstallerTests : IDisposable
         (root["hooks"] as JsonObject ?? [])
             .SelectMany(kv => kv.Value!.AsArray())
             .SelectMany(g => g!["hooks"]!.AsArray())
-            .Count(h => (string?)h!["url"] == HookUrl);
+            .Count(h => (string?)h!["url"] == HookUrl || (string?)h!["command"] == HookInstaller.HookCommand);
 
     private const string UserSettings = """
         {
@@ -74,6 +74,47 @@ public sealed class HookInstallerTests : IDisposable
         Assert.Equal("opus", (string?)root["model"]);
         Assert.Equal("my-guard.sh", (string?)root["hooks"]!["PreToolUse"]![0]!["hooks"]![0]!["command"]);
         Assert.Equal(2, root["hooks"]!["PreToolUse"]!.AsArray().Count);
+    }
+
+    [Fact]
+    public void SessionStart_IsACommandHook_BecauseClaudeCodeRunsNoHttpThere()
+    {
+        HookInstaller.Install(Settings, Url, Now);
+        var entry = Read()["hooks"]!["SessionStart"]![0]!["hooks"]![0]!;
+
+        Assert.Equal("command", (string?)entry["type"]);
+        Assert.Equal(HookInstaller.HookCommand, (string?)entry["command"]);
+        Assert.Null(entry["url"]);
+        Assert.Equal("http", (string?)Read()["hooks"]!["SessionEnd"]![0]!["hooks"]![0]!["type"]);
+    }
+
+    [Fact]
+    public void Install_ReplacesTheOldHttpSessionStart_AndKeepsTheUsersOwn()
+    {
+        Write($$"""
+            { "hooks": { "SessionStart": [
+                { "hooks": [ { "type": "http", "url": "{{HookUrl}}", "timeout": 2 } ] },
+                { "hooks": [ { "type": "command", "command": "my-start.sh" }, { "type": "http", "url": "{{HookUrl}}" } ] } ] } }
+            """);
+
+        var result = HookInstaller.Install(Settings, Url, Now);
+        var groups = Read()["hooks"]!["SessionStart"]!.AsArray();
+        var entries = groups.SelectMany(g => g!["hooks"]!.AsArray()).ToList();
+
+        Assert.True(result.Changed);
+        Assert.DoesNotContain(entries, h => (string?)h!["type"] == "http");
+        Assert.Contains(entries, h => (string?)h!["command"] == "my-start.sh");
+        Assert.Single(entries, h => (string?)h!["command"] == HookInstaller.HookCommand);
+    }
+
+    [Fact]
+    public void Uninstall_RemovesTheCommandHookToo()
+    {
+        HookInstaller.Install(Settings, Url, Now);
+
+        HookInstaller.Uninstall(Settings, Url, Now.AddSeconds(1));
+
+        Assert.Equal(0, OurHooks(Read()));
     }
 
     [Fact]

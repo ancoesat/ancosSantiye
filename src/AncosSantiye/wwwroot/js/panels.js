@@ -149,7 +149,7 @@ function piecesSection(site, pieces) {
     );
 
   if (rows.length === 0) {
-    node.append(emptyLine("No pieces yet"));
+    node.append(emptyLine("No task list or pieces yet. Tasks show up when Claude keeps a plan; pieces come from an orchestra status file (--profile)."));
     return node;
   }
 
@@ -280,7 +280,8 @@ function activitySection(events) {
   details.append(summary);
 
   const list = make("ol", "activity");
-  const recent = events.slice(-20).reverse();
+  // A tool ending says nothing new after its start: leave it out, so every line is a real step.
+  const recent = events.filter((e) => e && e.kind !== "tool.end").slice(-20).reverse();
   if (recent.length === 0) {
     list.append(make("li", "empty", "No activity yet"));
   }
@@ -289,10 +290,16 @@ function activitySection(events) {
     if (!event || typeof event !== "object") continue;
     const actor = event.actor && typeof event.actor === "object" ? event.actor : {};
     const who = actor.name || actor.role || "unknown";
-    let text = `${who} ${isMissing(event.kind) ? "" : event.kind}`.trim();
-    const tool = event.data && typeof event.data === "object" ? event.data.tool : null;
-    const extra = !isMissing(tool) ? tool : event.piece;
-    if (!isMissing(extra)) text += ` ${extra}`;
+    // The bubble line says it best ("Reading SPEC.md"); otherwise the kind and its tool or piece.
+    const data = event.data && typeof event.data === "object" ? event.data : {};
+    let text;
+    if (!isMissing(data.say)) {
+      text = `${who}: ${data.say}`;
+    } else {
+      text = `${who} ${isMissing(event.kind) ? "" : event.kind}`.trim();
+      const extra = !isMissing(data.tool) ? data.tool : event.piece;
+      if (!isMissing(extra)) text += ` ${extra}`;
+    }
 
     const item = document.createElement("li");
     item.append(make("time", null, clockOf(event.ts)));

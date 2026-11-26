@@ -13,6 +13,12 @@ public static class HookInstaller
 {
     public const string StatusLineCommand = "ancos-santiye statusline";
 
+    /// <summary>Forwards a hook payload from stdin (see Cli). Used where Claude Code allows no http hook.</summary>
+    public const string HookCommand = "ancos-santiye hook";
+
+    /// <summary>Events Claude Code only runs as command hooks; an http entry there never fires.</summary>
+    public static readonly IReadOnlySet<string> CommandOnly = new HashSet<string> { "SessionStart" };
+
     /// <summary>Seconds. An HTTP hook blocks Claude Code until it answers, so keep it short.</summary>
     public const int HookTimeoutSeconds = 2;
 
@@ -75,6 +81,12 @@ public static class HookInstaller
             {
                 groups = [];
                 hooks[name] = groups;
+            }
+
+            // An http entry of ours where only commands run (v0.1 put one on SessionStart) never fired: replace it.
+            if (CommandOnly.Contains(name) && RemoveOurHttp(groups, url))
+            {
+                changed = true;
             }
 
             if (!groups.Any(g => Ours(g, url).Any()))
@@ -195,20 +207,41 @@ public static class HookInstaller
             group["matcher"] = "*";
         }
 
-        group["hooks"] = new JsonArray(new JsonObject
-        {
-            ["type"] = "http",
-            ["url"] = HookUrl(baseUrl),
-            ["timeout"] = HookTimeoutSeconds,
-        });
+        group["hooks"] = new JsonArray(CommandOnly.Contains(hookName)
+            ? new JsonObject { ["type"] = "command", ["command"] = HookCommand, ["timeout"] = HookTimeoutSeconds }
+            : new JsonObject { ["type"] = "http", ["url"] = HookUrl(baseUrl), ["timeout"] = HookTimeoutSeconds });
         return group;
     }
 
     /// <summary>Our hook entries inside one group. Tolerates any shape: odd entries are simply not ours.</summary>
     private static IEnumerable<JsonNode> Ours(JsonNode? group, string url) =>
         group is JsonObject g && g["hooks"] is JsonArray hooks
-            ? hooks.OfType<JsonObject>().Where(h => Str(h, "type") == "http" && Str(h, "url") == url)
+            ? hooks.OfType<JsonObject>().Where(h =>
+                (Str(h, "type") == "http" && Str(h, "url") == url) || (Str(h, "type") == "command" && Str(h, "command") == HookCommand))
             : [];
+
+    /// <summary>Removes our http entries from these groups, and a group only if that emptied it.</summary>
+    private static bool RemoveOurHttp(JsonArray groups, string url)
+    {
+        var changed = false;
+        foreach (var group in groups.ToList())
+        {
+            if (group is not JsonObject g || g["hooks"] is not JsonArray inner)
+            {
+                continue;
+            }
+
+            var http = inner.OfType<JsonObject>().Where(h => Str(h, "type") == "http" && Str(h, "url") == url).ToList();
+            http.ForEach(h => inner.Remove(h));
+            changed |= http.Count > 0;
+            if (http.Count > 0 && inner.Count == 0)
+            {
+                groups.Remove(group);
+            }
+        }
+
+        return changed;
+    }
 
     private static bool IsOurStatusLine(JsonNode? statusLine) =>
         statusLine is JsonObject o && Str(o, "command") == StatusLineCommand;

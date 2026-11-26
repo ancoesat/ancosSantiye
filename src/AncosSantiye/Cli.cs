@@ -16,6 +16,10 @@ public static class Cli
                 await StatusLine(stdin, stdout, url);
                 return 0;
 
+            case ["hook"]:
+                await Forward(stdin, url);
+                return 0;
+
             case ["hooks", "print"]:
                 stdout.WriteLine(HookInstaller.Print(HookInstaller.Snippet(url)));
                 return 0;
@@ -44,7 +48,7 @@ public static class Cli
     }
 
     public const string Usage =
-        "Usage: ancos-santiye [--urls <url>] [--profile <file>] | statusline | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]";
+        "Usage: ancos-santiye [--urls <url>] [--profile <file>] | statusline | hook | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]";
 
     /// <summary>No arguments, or only server options like --urls. Help flags are not a server start.</summary>
     public static bool IsServerStart(string[] args) =>
@@ -82,6 +86,24 @@ public static class Cli
         stdout.WriteLine(StatusLineFeed.Line(status, url, up));
     }
 
+
+    /// <summary>
+    /// For hook events that Claude Code only runs as a command (SessionStart): pass the payload on to the
+    /// server's hook endpoint. Silent and always exit 0, so a server that is down never bothers Claude Code.
+    /// </summary>
+    private static async Task Forward(TextReader stdin, string url)
+    {
+        var input = await stdin.ReadToEndAsync();
+        try
+        {
+            using var http = new HttpClient(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromMilliseconds(1500) };
+            using var content = new StringContent(input, Encoding.UTF8, "application/json");
+            using var _ = await http.PostAsync(url + "/hooks/claude", content);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+        }
+    }
 
     private static int Report(HookInstaller.Result result, string verb, TextWriter stdout, TextWriter stderr)
     {

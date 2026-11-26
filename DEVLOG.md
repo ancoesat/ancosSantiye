@@ -144,6 +144,16 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Version 0.2.0.
 - Claude checked: `check.sh` green (256 tests). 7 mutations caught (waiting lasts longer, same state when nothing left, served state and snapshot drop silent workers, load filter, unwatched folder gates left out, the install note).
 
+## 2026-11-26 v0.2.1: what the first desktop day showed
+
+- A read-only diagnosis run in Claude Code (prompt from this session) found: 354 events today, none `session.*start` and none `task.*`, while the desktop sessions worked all day.
+- SessionStart: Claude Code runs only `command` and `mcp_tool` hooks there, so the `http` entry installed since F2 never fired. New `ancos-santiye hook` reads the payload from stdin and posts it to the server (1.5 s limit, silent, always exit 0). `hooks install` puts SessionStart on it and removes our old `http` entry there; the user's own entries stay.
+- Tasks: the desktop app keeps its plan with `mcp__ccd_turn__update_plan`, not TaskCreate (schema asked from the tool itself). The mapper turns `items` (whole list, at most 12 steps, `content` cut to 60 characters, `status` pending, in_progress or completed) and `done`, `start`, `advance` into flat values; the reducer keeps them as the session's tasks `p1`..`p12`, with the in-progress step as the current task.
+- Activity: the hub keeps the last 20 events per project (rebuilt on replay); `/activity?project=` gives them, and a fresh page starts with them instead of an empty list. Lines show the bubble text ("Claude Code: Editing Matches.ts"), and tool ends are left out.
+- Desktop tools: the browser tools say "Using the browser" and count as reading; the plan tool says "Updating the plan"; `wrap_up` says "Wrapping up". Empty Pieces says where tasks and pieces come from. Several sessions of one project get numbered names and stand 30 pixels apart.
+- Version 0.2.1.
+- Claude checked: `check.sh` green (268 tests). 12 mutations caught; one (replay clears the recent list) survived first, because the 20 event cap hid it, and got a test with a small project. End to end: SessionStart through the real `hook` command, a 4 step plan, the browser and an edit: header "1 of 4 tasks done / now: Add the match collection", the Tasks panel, the worker on the building, Activity filled on page load.
+
 ## Problems
 
 | Problem | Cause | Fix |

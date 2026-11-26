@@ -131,6 +131,30 @@ public sealed class SiteHubTests : IDisposable
     }
 
     [Fact]
+    public void RecentEvents_PerProject_LastOnesOnly_AndAfterALoad()
+    {
+        for (var i = 0; i < SiteHub.RecentCount + 5; i++)
+        {
+            _hub.Publish(In("kbyte", i, EventKinds.ToolStart, null, ("tool", $"T{i}")));
+        }
+
+        _hub.Publish(In("rovans", 100, EventKinds.ToolStart, null, ("tool", "Read")));
+
+        var kbyte = _hub.RecentOf("KBYTE");
+        Assert.Equal(SiteHub.RecentCount, kbyte.Count);
+        Assert.Equal("T5", kbyte[0].Data!["tool"]);
+        Assert.Equal("T24", kbyte[^1].Data!["tool"]);
+        Assert.Single(_hub.RecentOf(null));
+
+        var fresh = new SiteHub(new EventLog(_dir), _clock);
+        fresh.Load(DateOnly.FromDateTime(Start.UtcDateTime));
+        Assert.Equal(SiteHub.RecentCount, fresh.RecentOf("kbyte").Count);
+
+        _hub.Load(DateOnly.FromDateTime(Start.UtcDateTime));
+        Assert.Single(_hub.RecentOf("rovans"));
+    }
+
+    [Fact]
     public void NothingYet_IsEmpty()
     {
         Assert.Empty(_hub.Projects);

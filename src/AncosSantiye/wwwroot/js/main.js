@@ -145,6 +145,11 @@ if (demoMode) {
         fillPicker(projects);
         alertAll(projects);
         const query = current ? `?project=${encodeURIComponent(current)}` : "";
+        // A fresh page (or a new project on screen) starts with what already happened, not an empty list.
+        if (feed.length === 0) {
+          const recent = await (await fetch(`/activity${query}`)).json();
+          if (Array.isArray(recent) && feed.length === 0) recent.forEach(pushEvent);
+        }
         const response = await fetch(`/state${query}`);
         if (!response.ok) return;
         show(await response.json());

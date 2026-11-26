@@ -27,6 +27,7 @@ public static class Doing
     public static string Of(string? tool) => tool switch
     {
         "Read" or "Grep" or "Glob" or "LS" or "WebFetch" or "WebSearch" or "NotebookRead" => Read,
+        _ when tool?.StartsWith("mcp__Claude_Browser__", StringComparison.Ordinal) == true => Read,
         "Write" or "Edit" or "MultiEdit" or "NotebookEdit" => Build,
         "Bash" or "PowerShell" or "BashOutput" or "Monitor" or "KillShell" => Run,
         "AskUserQuestion" => Wait,
@@ -74,7 +75,7 @@ public sealed record ActorState(
 public sealed record PieceState(string Id, string Status, string? Verdict, DateTimeOffset Updated);
 
 /// <summary>One task of a session's task list. The subject is the agent's own short title for it.</summary>
-public sealed record TaskState(string Id, string Session, string? Subject, bool Done, DateTimeOffset Created, DateTimeOffset Updated);
+public sealed record TaskState(string Id, string Session, string? Subject, bool Done, DateTimeOffset Created, DateTimeOffset Updated, bool Active = false);
 
 public sealed record GateState(string Id, string? Piece, string? Label, DateTimeOffset Since);
 
@@ -117,7 +118,8 @@ public sealed record SiteState(
     public int TasksDone => CurrentList.Count(t => t.Done);
 
     /// <summary>The first open task of the current list: what the work is about right now.</summary>
-    public string? CurrentTask => CurrentList.FirstOrDefault(t => !t.Done)?.Subject;
+    public string? CurrentTask =>
+        (CurrentList.FirstOrDefault(t => t.Active && !t.Done) ?? CurrentList.FirstOrDefault(t => !t.Done))?.Subject;
 
     /// <summary>When the status line last sent new values. The page uses it to say how old Budget is.</summary>
     public DateTimeOffset? UsageUpdated { get; init; }

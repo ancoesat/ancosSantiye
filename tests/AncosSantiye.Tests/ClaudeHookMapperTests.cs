@@ -186,4 +186,56 @@ public class ClaudeHookMapperTests
 
         Assert.Equal(ClaudeHookMapper.MaxSay, e.Data!["subject"].Length);
     }
+
+    private static SiteEvent Plan(string input) => Map($$"""
+        { "session_id": "s", "cwd": "/x/p", "hook_event_name": "PreToolUse",
+          "tool_name": "mcp__ccd_turn__update_plan", "tool_input": {{input}} }
+        """)!;
+
+    [Fact]
+    public void DesktopPlan_BecomesFlatSteps()
+    {
+        var e = Plan("""
+            { "items": [
+                { "content": "Check server health", "status": "completed" },
+                { "content": "Read today's event log", "status": "in_progress", "session": "secret-session" },
+                { "content": "Write the report", "status": "pending" },
+                { "content": "Bad status", "status": "weird" } ],
+              "scope": "continuation" }
+            """);
+
+        Assert.Equal("Updating the plan", e.Data!["say"]);
+        Assert.Equal("3", e.Data["planItems"]);
+        Assert.Equal("completed|Check server health", e.Data["step1"]);
+        Assert.Equal("in_progress|Read today's event log", e.Data["step2"]);
+        Assert.Equal("pending|Write the report", e.Data["step3"]);
+        Assert.DoesNotContain("secret-session", JsonSerializer.Serialize(e, EventJson.Options));
+    }
+
+    [Fact]
+    public void DesktopPlan_SmallUpdates_AndLimits()
+    {
+        var steps = string.Join(",", Enumerable.Range(1, 15).Select(n => $$"""{ "content": "{{new string('x', 100)}}", "status": "pending" }"""));
+        var big = Plan($$"""{ "items": [ {{steps}} ] }""");
+        var small = Plan("""{ "done": [1, 3, 99, -1], "start": 4, "advance": true }""");
+        var nothing = Plan("""{ "start": 40, "advance": false }""");
+
+        Assert.Equal("12", big.Data!["planItems"]);
+        Assert.False(big.Data.ContainsKey("step13"));
+        Assert.Equal(ClaudeHookMapper.MaxSay, big.Data["step1"].Split('|')[1].Length);
+        Assert.Equal("1,3", small.Data!["planDone"]);
+        Assert.Equal("4", small.Data["planStart"]);
+        Assert.Equal("true", small.Data["planAdvance"]);
+        Assert.False(nothing.Data!.ContainsKey("planStart"));
+        Assert.False(nothing.Data.ContainsKey("planAdvance"));
+        Assert.False(nothing.Data.ContainsKey("planItems"));
+    }
+
+    [Theory]
+    [InlineData("mcp__Claude_Browser__browser_batch", "Using the browser")]
+    [InlineData("mcp__ccd_turn__wrap_up", "Wrapping up")]
+    public void DesktopTools_HavePlainBubbles(string tool, string expected)
+    {
+        Assert.Equal(expected, Say(tool, "{}"));
+    }
 }

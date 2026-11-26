@@ -278,4 +278,62 @@ public class SiteReducerTests
         Assert.Equal(["chief"], Silence.Drop(s, start.AddMinutes(59)).Actors.Keys);
         Assert.Empty(Silence.Drop(s, start.AddMinutes(61)).Actors);
     }
+
+    private static SiteEvent PlanEvent(int second, params (string, string)[] plan)
+    {
+        var data = new Dictionary<string, string> { ["tool"] = "mcp__ccd_turn__update_plan" };
+        foreach (var (k, v) in plan)
+        {
+            data[k] = v;
+        }
+
+        return SiteEvent.Create(Sources.ClaudeCode, "demo", Ev.Chief, EventKinds.ToolStart, session: "d", data: data,
+            ts: new DateTimeOffset(2026, 11, 26, 10, 0, second, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void DesktopPlan_IsTheTaskList()
+    {
+        var s = SiteReducer.Replay([PlanEvent(0,
+            ("planItems", "3"), ("step1", "completed|Check health"), ("step2", "in_progress|Read the log"), ("step3", "pending|Write report"))]);
+
+        Assert.Equal((3, 1), (s.TasksPlanned, s.TasksDone));
+        Assert.Equal("Read the log", s.CurrentTask);
+        Assert.Equal(Doing.Plan, s.Actors["chief"].Action);
+    }
+
+    [Fact]
+    public void DesktopPlan_Advance_Done_Start_AndReplace()
+    {
+        var s = SiteReducer.Replay([
+            PlanEvent(0, ("planItems", "4"), ("step1", "in_progress|A"), ("step2", "pending|B"), ("step3", "pending|C"), ("step4", "pending|D")),
+            PlanEvent(1, ("planAdvance", "true")),
+        ]);
+        Assert.Equal((4, 1), (s.TasksPlanned, s.TasksDone));
+        Assert.Equal("B", s.CurrentTask);
+
+        s = SiteReducer.Reduce(s, PlanEvent(2, ("planDone", "2,3")));
+        Assert.Equal((4, 3), (s.TasksPlanned, s.TasksDone));
+        Assert.Equal("D", s.CurrentTask);
+
+        s = SiteReducer.Replay([
+            PlanEvent(0, ("planItems", "3"), ("step1", "pending|A"), ("step2", "pending|B"), ("step3", "pending|C")),
+            PlanEvent(1, ("planStart", "3")),
+        ]);
+        Assert.Equal("C", s.CurrentTask);
+
+        s = SiteReducer.Reduce(s, PlanEvent(2, ("planItems", "1"), ("step1", "pending|Only")));
+        Assert.Equal((1, 0), (s.TasksPlanned, s.TasksDone));
+        Assert.Equal("Only", s.CurrentTask);
+    }
+
+    [Fact]
+    public void DesktopPlan_KeepsOrderPastNineSteps()
+    {
+        var steps = Enumerable.Range(1, 11).Select(n => ($"step{n}", n == 10 ? "in_progress|Ten" : n < 10 ? $"completed|{n}" : "pending|Eleven"));
+        var s = SiteReducer.Replay([PlanEvent(0, [("planItems", "11"), .. steps])]);
+
+        Assert.Equal("Ten", s.CurrentTask);
+        Assert.Equal(["1", "2", "3", "4", "5", "6", "7", "8", "9", "Ten", "Eleven"], s.CurrentTasks.Select(t => t.Subject));
+    }
 }

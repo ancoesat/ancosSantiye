@@ -59,9 +59,15 @@ public static class ClaudeHookMapper
         if (tool is not null)
         {
             data = new Dictionary<string, string> { ["tool"] = tool };
+            var input = hook.TryGetProperty("tool_input", out var given) ? given : default;
             if (kind is EventKinds.ToolStart or EventKinds.ToolFail)
             {
-                data["say"] = Say(tool, hook.TryGetProperty("tool_input", out var input) ? input : default);
+                data["say"] = Say(tool, input);
+            }
+
+            if (kind is EventKinds.ToolStart && tool == PlanTool)
+            {
+                AddPlan(data, input);
             }
         }
 
@@ -76,6 +82,66 @@ public static class ClaudeHookMapper
     }
 
     public const int MaxSay = 60;
+
+    /// <summary>The Claude desktop app keeps its task list with this tool instead of TaskCreate.</summary>
+    public const string PlanTool = "mcp__ccd_turn__update_plan";
+
+    public const int MaxPlanSteps = 12;
+
+    private static readonly HashSet<string> PlanStatuses = ["pending", "in_progress", "completed"];
+
+    /// <summary>
+    /// The plan as flat values: <c>step1</c>..<c>step12</c> as "status|title" when the whole list is sent,
+    /// <c>planItems</c> with its length, and <c>planDone</c>, <c>planStart</c>, <c>planAdvance</c> for the
+    /// small updates. Step titles are the agent's own short words, cut like a bubble line.
+    /// </summary>
+    private static void AddPlan(Dictionary<string, string> data, JsonElement input)
+    {
+        if (input.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        if (input.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+        {
+            var n = 0;
+            foreach (var item in items.EnumerateArray())
+            {
+                if (n == MaxPlanSteps)
+                {
+                    break;
+                }
+
+                if (Field(item, "status") is { } status && PlanStatuses.Contains(status))
+                {
+                    var title = Short(Field(item, "content")) ?? "Step";
+                    title = title.Length <= MaxSay ? title : title[..(MaxSay - 3)] + "...";
+                    data[$"step{++n}"] = $"{status}|{title}";
+                }
+            }
+
+            data["planItems"] = n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        if (input.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.Array)
+        {
+            var steps = done.EnumerateArray()
+                .Where(d => d.ValueKind == JsonValueKind.Number && d.TryGetInt32(out var i) && i is >= 1 and <= MaxPlanSteps)
+                .Select(d => d.GetInt32().ToString(System.Globalization.CultureInfo.InvariantCulture));
+            data["planDone"] = string.Join(',', steps);
+        }
+
+        if (input.TryGetProperty("start", out var start) && start.ValueKind == JsonValueKind.Number
+            && start.TryGetInt32(out var s) && s is >= 1 and <= MaxPlanSteps)
+        {
+            data["planStart"] = s.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        if (input.TryGetProperty("advance", out var advance) && advance.ValueKind == JsonValueKind.True)
+        {
+            data["planAdvance"] = "true";
+        }
+    }
 
     /// <summary>
     /// One short line for the speech bubble. Only these parts of the input are ever read: the last
@@ -101,6 +167,9 @@ public static class ClaudeHookMapper
             "AskUserQuestion" => "Asking you something",
             "ExitPlanMode" => "Plan ready",
             "Skill" => $"Using skill {Short(Field(input, "skill")) ?? "?"}",
+            PlanTool => "Updating the plan",
+            "mcp__ccd_turn__wrap_up" => "Wrapping up",
+            _ when tool.StartsWith("mcp__Claude_Browser__", StringComparison.Ordinal) => "Using the browser",
             _ when tool.StartsWith("mcp__", StringComparison.Ordinal) => $"Using {tool.Split("__")[1]}",
             _ => $"Using {tool}",
         };

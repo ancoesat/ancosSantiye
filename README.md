@@ -13,7 +13,7 @@ It runs on your machine only: a small .NET server on `127.0.0.1` and one page in
 - **The site:** a chief, workers, a subcontractor, an inspector, an architect and a supplier truck, each tied to a real agent role. Workers climb to the roof while they work, wait on the ground when idle, and walk off when their session ends.
 - **Speech bubbles:** each worker says what it is doing right now ("Reading SPEC.md", "Run the unit tests", "Waiting for you").
 - **Places that mean something:** reading and searching happen at the board by the gate, editing on the building (on the roof once it has floors), commands at the crane controls, planning and calling helpers at the site office. Waiting means standing still at its own spot. A worker only walks when it starts doing something else.
-- **Progress from the task list:** when Claude Code keeps a task list, the header shows "2 of 4 tasks done / now: ...", each task is a block on the building, and the side panel lists the tasks. Without a task list (or an orchestra status file) there is no building: nothing is pretended.
+- **Progress from the task list:** when Claude Code keeps a task list (TaskCreate in the terminal, the plan in the desktop app), the header shows "2 of 4 tasks done / now: ...", each task is a block on the building, and the side panel lists the tasks. Without a task list (or an orchestra status file) there is no building: nothing is pretended.
 - **Side panels:** what is waiting for you, every piece and its status, your context window and plan limits (5 hour and 7 day), and the last events.
 - **Notifications:** one beep and one browser notification per new gate, never on page load.
 - **Folder lane (optional):** watch a folder with a markdown status file and delivery files, so work done outside Claude Code (other models, other tools, you) shows up too.
@@ -57,7 +57,7 @@ dotnet run --project src/AncosSantiye
    ancos-santiye hooks install
    ```
 
-   This adds HTTP hooks and the status line to `~/.claude/settings.json`. It backs the file up first (timestamped `.bak` next to it), keeps every hook and setting you already have, and keeps an existing status line instead of replacing it. Want to see what it adds before it adds it? `ancos-santiye hooks print`. To remove it: `ancos-santiye hooks uninstall`. Another settings file: `--settings <path>`.
+   This adds HTTP hooks and the status line to `~/.claude/settings.json` (SessionStart becomes a small `ancos-santiye hook` command, because Claude Code runs only commands there). It backs the file up first (timestamped `.bak` next to it), keeps every hook and setting you already have, and keeps an existing status line instead of replacing it. Want to see what it adds before it adds it? `ancos-santiye hooks print`. To remove it: `ancos-santiye hooks uninstall`. Another settings file: `--settings <path>`.
 
 3. Start a Claude Code session. A worker walks onto the site.
 
