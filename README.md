@@ -2,7 +2,7 @@
 
 Watch your AI coding agents build your project as a pixel art construction site.
 
-![ancosSantiye: workers with speech bubbles saying what each agent is doing, in a live session (top) and the build demo (bottom)](https://raw.githubusercontent.com/ancoesat/ancosSantiye/main/docs/hero.png)
+![ancosSantiye: a pixel construction site where each AI agent is a worker with a speech bubble saying what it is doing, next to the "Waiting for you" and "Pieces" panels](https://raw.githubusercontent.com/ancoesat/ancosSantiye/main/docs/hero.png)
 
 Every Claude Code session becomes a worker on the site. Subagents, reviewers and outside suppliers get their own characters. The building grows floor by floor as your project moves through its stages, and pieces show up as bricks, glass and crates. Anything that waits for you (an approval, a review) lands on the board by the gate and in the "Waiting for you" panel, with a sound and a browser notification if you want them.
 
@@ -68,6 +68,8 @@ If the server is not running, Claude Code carries on as usual: the hooks give up
 ## Setup and diagnose
 
 Open http://127.0.0.1:5170/setup.html (the "Setup" link in the header), or run `ancos-santiye doctor` in a terminal. It looks for AI coding tools on this computer (Claude Code, OpenCode, Antigravity CLI, Codex, Gemini CLI, Cursor agent, Aider, Qwen Code) by their program on PATH and their config folder, and for each one says whether ancosSantiye is connected, when its last event came in, and what is missing.
+
+![The setup page: Claude Code and OpenCode connected, the Antigravity CLI found but not connected](https://raw.githubusercontent.com/ancoesat/ancosSantiye/main/docs/setup.png)
 
 Three tools can be connected, with the Connect button on that page (it asks first) or in a terminal:
 

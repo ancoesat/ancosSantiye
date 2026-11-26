@@ -108,6 +108,8 @@ function waitingSection(gates, now) {
     .sort((a, b) => timeOf(b.gate.since) - timeOf(a.gate.since));
 
   const node = section(rows.length > 0 ? `Waiting for you (${rows.length})` : "Waiting for you");
+  node.classList.add("waiting");
+  if (rows.length > 0) node.classList.add("alert");
   node.append(controls());
 
   if (rows.length === 0) {

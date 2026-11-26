@@ -36,7 +36,7 @@ const cast = new Cast(skin);
 
 // Largest whole-number scale that fits next to the side panel.
 function fit() {
-  const room = Math.min((window.innerWidth - 280) / width, (window.innerHeight - 80) / height);
+  const room = Math.min((window.innerWidth - 400) / width, (window.innerHeight - 140) / height);
   scale = Math.max(1, Math.floor(room));
   canvas.style.width = `${width * scale}px`;
   canvas.style.height = `${height * scale}px`;
