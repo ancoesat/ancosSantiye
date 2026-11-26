@@ -29,6 +29,11 @@ export class Cast {
     this.members = new Map();
   }
 
+  // Another project on screen: its people were never here, so they do not walk off, they vanish.
+  clear() {
+    this.members.clear();
+  }
+
   sync(actors, width, model) {
     const groundY = this.skin.def.scene.groundY;
     const floors = model?.floors?.length ?? 0;

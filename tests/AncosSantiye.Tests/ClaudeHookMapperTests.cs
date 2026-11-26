@@ -32,8 +32,20 @@ public class ClaudeHookMapperTests
         Assert.Equal("Bash", e.Data!["tool"]);
         Assert.Equal("my-project", e.Project);
         Assert.Equal("abc123", e.Session);
-        Assert.Equal("chief", e.Actor.Id);
+        Assert.Equal("chief:abc123", e.Actor.Id);
         Assert.Equal(At, e.Ts);
+    }
+
+    [Fact]
+    public void TwoSessions_AreTwoWorkers()
+    {
+        var first = Map(PreToolUse)!;
+        var second = Map(PreToolUse.Replace("abc123", "def456"))!;
+        var noSession = Map(PreToolUse.Replace("\"session_id\": \"abc123\",", ""))!;
+
+        Assert.NotEqual(first.Actor.Id, second.Actor.Id);
+        Assert.Equal(Roles.Chief, second.Actor.Role);
+        Assert.Equal("chief", noSession.Actor.Id);
     }
 
     [Fact]

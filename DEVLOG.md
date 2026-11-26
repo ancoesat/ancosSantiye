@@ -108,6 +108,13 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Front: a speech bubble above each name tag (white, yellow when waiting for you, red on failure). Bubbles of workers standing close stack in rows instead of covering each other.
 - Claude checked: `check.sh` green (222 tests). 8 mutations caught (full path, command, first line only, length cap, say only on start and fail, URL host only, line kept between tools, waiting line). Live test with real hook payloads (a Bash command with a secret, a Grep pattern): the state carries only the bubble lines. Headless Chrome: live and demo, no console errors.
 
+## 2026-11-26 v0.2 #4: one project at a time, one worker per session
+
+- `SiteHub` keeps one `SiteState` per project (names match without case, so the folder lane's `kbyte` and the session folder `KBYTE` are one project). `/projects` lists them, latest first, with worker counts and waiting gates; `/state?project=` and `/events?project=` give one project, and without it the latest one.
+- Every Claude Code session is its own worker (`chief:<session>`). Before this, every main session shared the id `chief`, so two windows looked like one worker.
+- Page: a project picker in the header. Default is "follow latest": the page switches to whichever project acted last and clears the scene at once (people of another project do not walk off, they were never there). Picking a project pins it in the address. Alerts come from the gates of every project; a gate elsewhere is labeled with its project name.
+- Claude checked: `check.sh` green (231 tests). 6 mutations caught (case-blind names, latest is default, a late older event does not push a project back, subscribe to one project, `/state?project`, one worker per session); the late-event one survived first and got its own test. Headless Chrome with hooks from three sessions in two projects: follow mode switched to KBYTE when it acted and showed only its worker; pinned to rovans it kept rovans' two workers while KBYTE acted. No console errors.
+
 ## Problems
 
 | Problem | Cause | Fix |

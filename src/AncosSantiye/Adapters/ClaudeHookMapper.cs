@@ -53,7 +53,7 @@ public static class ClaudeHookMapper
         return SiteEvent.Create(
             Sources.ClaudeCode,
             ProjectName(Text(hook, "cwd")),
-            ActorFor(Text(hook, "agent_id"), Text(hook, "agent_type")),
+            ActorFor(Text(hook, "agent_id"), Text(hook, "agent_type"), Text(hook, "session_id")),
             kind,
             session: Text(hook, "session_id"),
             data: data,
@@ -113,9 +113,13 @@ public static class ClaudeHookMapper
         return string.IsNullOrEmpty(name) ? "unknown" : name;
     }
 
-    private static Actor ActorFor(string? agentId, string? agentType) =>
+    /// <summary>
+    /// One main worker per session, so two Claude Code windows on one project are two workers.
+    /// Subagents already have their own id.
+    /// </summary>
+    private static Actor ActorFor(string? agentId, string? agentType, string? session) =>
         agentId is null
-            ? Chief
+            ? session is null ? Chief : Chief with { Id = $"chief:{session}" }
             : new Actor(agentId, agentType switch
             {
                 "denetci" => Roles.Inspector,

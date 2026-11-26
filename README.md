@@ -2,7 +2,7 @@
 
 Watch your AI coding agents build your project as a pixel art construction site.
 
-![ancosSantiye in demo mode: workers on the roof, a supplier truck, the side panels](https://raw.githubusercontent.com/ancoesat/ancosSantiye/main/docs/hero.png)
+![ancosSantiye: workers with speech bubbles saying what each agent is doing, in a live session (top) and the build demo (bottom)](https://raw.githubusercontent.com/ancoesat/ancosSantiye/main/docs/hero.png)
 
 Every Claude Code session becomes a worker on the site. Subagents, reviewers and outside suppliers get their own characters. The building grows floor by floor as your project moves through its stages, and pieces show up as bricks, glass and crates. Anything that waits for you (an approval, a review) lands on the board by the gate and in the "Waiting for you" panel, with a sound and a browser notification if you want them.
 
@@ -70,7 +70,7 @@ Without a profile you get the built-in skin, Claude Code data only, and a read-o
   "folderLane": {
     "directory": "../_phase-logs",  // relative paths start at the profile file's folder
     "statusFile": "my-project-status.md",
-    "project": "my-project",
+    "project": "my-project",       // the repo folder name, so it joins that project's sessions
     "intervalSeconds": 1
   },
   "actions": { "enabled": false, "repos": [] }
@@ -82,6 +82,10 @@ ancos-santiye --profile path/to/profile.json
 ```
 
 A missing or broken profile stops the server with one clear line. It never falls back silently.
+
+### Projects
+
+The site shows one project at a time. A project is the folder a Claude Code session runs in (its last folder name, case does not matter). By default the page follows the project that was active last; pick one in the header to pin it (`?project=name` in the address). Alerts still come from every project, and the picker shows how many gates wait in each. Every Claude Code window is its own worker, so two sessions on one project are two workers.
 
 ### Folder lane
 

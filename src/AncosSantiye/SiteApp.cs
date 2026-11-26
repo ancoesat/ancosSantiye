@@ -115,8 +115,10 @@ public static class SiteApp
         }
 
         app.MapGet("/health", () => TypedResults.Ok(new { status = "ok" }));
-        app.MapGet("/state", (SiteHub h) => TypedResults.Ok(h.State));
-        app.MapGet("/events", (SiteHub h, CancellationToken ct) => TypedResults.ServerSentEvents(Stream(h, ct)));
+        // One project at a time. Without ?project the most recently active project is used.
+        app.MapGet("/projects", (SiteHub h) => TypedResults.Ok(h.Projects));
+        app.MapGet("/state", (SiteHub h, string? project) => TypedResults.Ok(h.StateOf(project)));
+        app.MapGet("/events", (SiteHub h, string? project, CancellationToken ct) => TypedResults.ServerSentEvents(Stream(h, project, ct)));
 
         // Claude Code hooks. Answer at once: an HTTP hook blocks Claude Code until it returns.
         app.MapPost("/hooks/claude", async (HttpRequest request, SiteHub h, CancellationToken ct) =>
@@ -280,12 +282,13 @@ public static class SiteApp
         }
     }
 
-    /// <summary>First a "snapshot" of the whole site, then every new "event" as it happens.</summary>
+    /// <summary>First a "snapshot" of one project, then every new "event" of every project as it happens.</summary>
     private static async IAsyncEnumerable<SseItem<object>> Stream(
         SiteHub hub,
+        string? project,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        using var subscription = hub.Subscribe();
+        using var subscription = hub.Subscribe(project);
         yield return new SseItem<object>(subscription.Snapshot, "snapshot");
 
         await foreach (var e in subscription.Reader.ReadAllAsync(ct))

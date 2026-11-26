@@ -67,6 +67,24 @@ public sealed class SiteAppTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Projects_AndStateOfOneProject()
+    {
+        var hub = _app.Services.GetRequiredService<SiteHub>();
+        hub.Publish(SiteEvent.Create(Sources.Folder, "kbyte", new Actor("folder", Roles.Chief), EventKinds.StageChanged,
+            data: new Dictionary<string, string> { ["stage"] = "T1" }, ts: DateTimeOffset.UtcNow.AddSeconds(-5)));
+        hub.Publish(SiteEvent.Create(Sources.Folder, "rovans", new Actor("folder", Roles.Chief), EventKinds.StageChanged,
+            data: new Dictionary<string, string> { ["stage"] = "F1" }, ts: DateTimeOffset.UtcNow));
+
+        using var projects = JsonDocument.Parse(await _http.GetStringAsync("/projects"));
+        using var latest = JsonDocument.Parse(await _http.GetStringAsync("/state"));
+        using var kbyte = JsonDocument.Parse(await _http.GetStringAsync("/state?project=KBYTE"));
+
+        Assert.Equal(["rovans", "kbyte"], projects.RootElement.EnumerateArray().Select(p => p.GetProperty("name").GetString()));
+        Assert.Equal("F1", latest.RootElement.GetProperty("stage").GetString());
+        Assert.Equal("T1", kbyte.RootElement.GetProperty("stage").GetString());
+    }
+
+    [Fact]
     public async Task Events_SendsASnapshotThenLiveEvents()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

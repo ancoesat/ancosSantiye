@@ -1,12 +1,17 @@
+using System.Collections.Immutable;
 using System.Threading.Channels;
 using AncosSantiye.Events;
 using AncosSantiye.Scene;
 
 namespace AncosSantiye.Store;
 
+/// <summary>One line in the project picker, with the gates that wait in it (so alerts work for every project).</summary>
+public sealed record ProjectInfo(string Name, DateTimeOffset LastSeen, int Workers, IReadOnlyList<GateState> Gates);
+
 /// <summary>
-/// Owns the current <see cref="SiteState"/>. Every event goes to the log first, then through the reducer,
-/// then out to live subscribers. A slow subscriber drops its oldest events instead of slowing everyone down.
+/// Owns one <see cref="SiteState"/> per project. Every event goes to the log first, then through the reducer
+/// of its own project, then out to live subscribers. A slow subscriber drops its oldest events instead of
+/// slowing everyone down. Project names match without regard to case ("kbyte" and "KBYTE" are one project).
 /// </summary>
 public sealed class SiteHub(EventLog log)
 {
@@ -14,26 +19,49 @@ public sealed class SiteHub(EventLog log)
 
     private readonly Lock _gate = new();
     private readonly List<Channel<SiteEvent>> _subscribers = [];
-    private SiteState _state = SiteState.Empty;
+    private ImmutableDictionary<string, (SiteState State, DateTimeOffset LastSeen)> _projects =
+        ImmutableDictionary.Create<string, (SiteState, DateTimeOffset)>(StringComparer.OrdinalIgnoreCase);
 
-    public SiteState State
+    /// <summary>The most recently active project's state. Empty when nothing has happened yet.</summary>
+    public SiteState State => StateOf(null);
+
+    /// <summary>One project's state; null means the most recently active project.</summary>
+    public SiteState StateOf(string? project)
+    {
+        lock (_gate)
+        {
+            var name = project ?? LatestLocked();
+            return name is not null && _projects.TryGetValue(name, out var entry) ? entry.State : SiteState.Empty;
+        }
+    }
+
+    /// <summary>Most recently active first.</summary>
+    public IReadOnlyList<ProjectInfo> Projects
     {
         get
         {
             lock (_gate)
             {
-                return _state;
+                return _projects
+                    .OrderByDescending(p => p.Value.LastSeen)
+                    .ThenBy(p => p.Key, StringComparer.Ordinal)
+                    .Select(p => new ProjectInfo(p.Key, p.Value.LastSeen, p.Value.State.Actors.Count, [.. p.Value.State.Gates.Values]))
+                    .ToArray();
             }
         }
     }
 
-    /// <summary>Rebuilds the state from one day's log. Returns how many lines were skipped as unreadable.</summary>
+    /// <summary>Rebuilds every project from one day's log. Returns how many lines were skipped as unreadable.</summary>
     public int Load(DateOnly day)
     {
         var result = log.Read(day);
         lock (_gate)
         {
-            _state = SiteReducer.Replay(result.Events);
+            _projects = _projects.Clear();
+            foreach (var e in result.Events)
+            {
+                ApplyLocked(e);
+            }
         }
 
         return result.Skipped;
@@ -45,7 +73,7 @@ public sealed class SiteHub(EventLog log)
         lock (_gate)
         {
             log.Append(e);
-            _state = SiteReducer.Reduce(_state, e);
+            ApplyLocked(e);
             subscribers = [.. _subscribers];
         }
 
@@ -55,8 +83,11 @@ public sealed class SiteHub(EventLog log)
         }
     }
 
-    /// <summary>The snapshot and the live feed are taken under one lock, so no event falls between them.</summary>
-    public Subscription Subscribe()
+    /// <summary>
+    /// The snapshot (of one project, or the latest) and the live feed are taken under one lock, so no event
+    /// falls between them. The feed carries every project: the page needs them to keep its picker current.
+    /// </summary>
+    public Subscription Subscribe(string? project = null)
     {
         var channel = Channel.CreateBounded<SiteEvent>(new BoundedChannelOptions(SubscriberBuffer)
         {
@@ -68,7 +99,8 @@ public sealed class SiteHub(EventLog log)
         lock (_gate)
         {
             _subscribers.Add(channel);
-            snapshot = _state;
+            var name = project ?? LatestLocked();
+            snapshot = name is not null && _projects.TryGetValue(name, out var entry) ? entry.State : SiteState.Empty;
         }
 
         return new Subscription(snapshot, channel.Reader, () =>
@@ -81,6 +113,18 @@ public sealed class SiteHub(EventLog log)
             channel.Writer.TryComplete();
         });
     }
+
+    private void ApplyLocked(SiteEvent e)
+    {
+        (SiteState State, DateTimeOffset LastSeen) old = _projects.TryGetValue(e.Project, out var entry) ? entry : (SiteState.Empty, DateTimeOffset.MinValue);
+        var next = SiteReducer.Reduce(old.State, e);
+        _projects = _projects.SetItem(e.Project, (next, e.Ts > old.LastSeen ? e.Ts : old.LastSeen));
+    }
+
+    private string? LatestLocked() =>
+        _projects.IsEmpty
+            ? null
+            : _projects.OrderByDescending(p => p.Value.LastSeen).ThenBy(p => p.Key, StringComparer.Ordinal).First().Key;
 
     public sealed class Subscription(SiteState snapshot, ChannelReader<SiteEvent> reader, Action onDispose) : IDisposable
     {

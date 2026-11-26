@@ -13,6 +13,7 @@ const ctx = canvas.getContext("2d");
 const tagLayer = document.getElementById("tags");
 const connection = document.getElementById("connection");
 const projectLabel = document.getElementById("project");
+const picker = document.getElementById("picker");
 const panels = document.getElementById("panels");
 
 const params = new URLSearchParams(location.search);
@@ -21,7 +22,9 @@ const demoName = params.get("demo");
 
 const notifier = new Notifier();
 const feed = [];
-let latestProject = demoMode ? "demo" : "";
+// One project at a time. ?project=x pins it; without it the page follows the latest active project.
+const pinned = params.get("project");
+let current = demoMode ? "demo" : pinned ?? "";
 let state = null;
 let scale = 1;
 
@@ -49,7 +52,7 @@ function pushEvent(event) {
 
 function drawHeader() {
   const parts = [];
-  if (latestProject) parts.push(latestProject);
+  if (demoMode && current) parts.push(current);
   if (state && state.stage) parts.push(String(state.stage));
   projectLabel.textContent = parts.join(" / ");
 }
@@ -58,7 +61,31 @@ function drawHeader() {
 function paint() {
   if (!state) return;
   renderPanels(panels, state, feed, Date.now());
-  notifier.check(state);
+  if (demoMode) notifier.check(state);
+}
+
+// Alerts cover every project, not only the one on screen, so a gate elsewhere is never missed.
+function alertAll(projects) {
+  const gates = {};
+  for (const project of projects) {
+    for (const gate of project.gates ?? []) {
+      const label = project.name === current ? gate.label ?? gate.id : `${project.name}: ${gate.label ?? gate.id}`;
+      gates[`${project.name}/${gate.id}`] = { ...gate, label };
+    }
+  }
+  notifier.check({ gates });
+}
+
+function fillPicker(projects) {
+  const options = [new Option(pinned ? "Follow latest" : `Latest: ${current || "none yet"}`, "")];
+  for (const project of projects) {
+    const waiting = (project.gates ?? []).length;
+    const label = waiting > 0 ? `${project.name} (${waiting} waiting)` : String(project.name);
+    options.push(new Option(label, String(project.name)));
+  }
+  picker.replaceChildren(...options);
+  picker.value = pinned ?? "";
+  picker.hidden = projects.length === 0;
 }
 
 function show(next) {
@@ -95,12 +122,25 @@ if (demoMode) {
   }
 } else {
   // The server keeps the real state. After an event, read it again (local, cheap, never out of step).
+  // In follow mode, the project on screen is the first one /projects lists (the latest active).
   let pending = 0;
   const refresh = () => {
     clearTimeout(pending);
     pending = setTimeout(async () => {
       try {
-        const response = await fetch("/state");
+        const projects = await (await fetch("/projects")).json();
+        if (!pinned) {
+          const latest = projects.length > 0 ? String(projects[0].name) : "";
+          if (latest.toLowerCase() !== current.toLowerCase()) {
+            feed.length = 0;
+            cast.clear();
+          }
+          current = latest;
+        }
+        fillPicker(projects);
+        alertAll(projects);
+        const query = current ? `?project=${encodeURIComponent(current)}` : "";
+        const response = await fetch(`/state${query}`);
         if (!response.ok) return;
         show(await response.json());
       } catch {
@@ -108,13 +148,24 @@ if (demoMode) {
       }
     }, 50);
   };
+
+  picker.addEventListener("change", () => {
+    const url = new URL(location.href);
+    if (picker.value) url.searchParams.set("project", picker.value);
+    else url.searchParams.delete("project");
+    location.assign(url);
+  });
+
   setupActions(document.getElementById("actions"));
   connect({
-    onSnapshot: show,
+    project: pinned,
+    onSnapshot: (snapshot) => {
+      show(snapshot);
+      refresh();
+    },
     onEvent: (event) => {
-      if (event && typeof event.project === "string" && event.project) latestProject = event.project;
-      pushEvent(event);
-      paint();
+      const project = event && typeof event.project === "string" ? event.project : "";
+      if (project.toLowerCase() === current.toLowerCase()) pushEvent(event);
       refresh();
     },
     onStatus: setConnected,

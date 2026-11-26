@@ -29,6 +29,15 @@ header {
 }
 
 #project { color: var(--quiet); }
+#picker {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: #2a2e36;
+  border: 1px solid #3a3f4a;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
 #connection { margin-left: auto; font-size: 12px; }
 #connection.on { color: var(--ok); }
 #connection.off { color: var(--off); }
