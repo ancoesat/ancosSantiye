@@ -34,6 +34,26 @@ public static class Doing
     };
 }
 
+/// <summary>
+/// A worker that has said nothing for a while has left, even if its session never said goodbye
+/// (the app was closed, the login ran out). Applied when the state is served, so the reducer and the
+/// log stay free of clock time. Waiting for you gets longer: you may just be away from the desk.
+/// </summary>
+public static class Silence
+{
+    public static readonly TimeSpan Working = TimeSpan.FromMinutes(15);
+    public static readonly TimeSpan Waiting = TimeSpan.FromMinutes(60);
+
+    public static SiteState Drop(SiteState state, DateTimeOffset now)
+    {
+        var gone = state.Actors
+            .Where(a => now - a.Value.LastSeen > (a.Value.Action == Doing.Wait ? Waiting : Working))
+            .Select(a => a.Key)
+            .ToArray();
+        return gone.Length == 0 ? state : state with { Actors = state.Actors.RemoveRange(gone) };
+    }
+}
+
 /// <summary>Bubble lines the reducer sets itself; tool lines come from the adapter.</summary>
 public static class Saying
 {

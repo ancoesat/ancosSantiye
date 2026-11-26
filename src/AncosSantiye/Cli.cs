@@ -99,7 +99,11 @@ public static class Cli
 
         if (result.StatusLineKept)
         {
-            stdout.WriteLine($"You already have a status line, so it was left alone. To show the site link, call `{HookInstaller.StatusLineCommand}` from it.");
+            stdout.WriteLine();
+            stdout.WriteLine("NOTE: you already have a status line, so it was left alone.");
+            stdout.WriteLine("The Budget panel stays empty until your status line also sends its data. Either:");
+            stdout.WriteLine($"  replace it in settings.json:  \"statusLine\": {{ \"type\": \"command\", \"command\": \"{HookInstaller.StatusLineCommand}\" }}");
+            stdout.WriteLine($"  or pass its input on from your own script:  echo \"$input\" | {HookInstaller.StatusLineCommand} > /dev/null");
         }
 
         return 0;

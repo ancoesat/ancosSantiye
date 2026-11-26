@@ -13,8 +13,10 @@ public sealed record ProjectInfo(string Name, DateTimeOffset LastSeen, int Worke
 /// of its own project, then out to live subscribers. A slow subscriber drops its oldest events instead of
 /// slowing everyone down. Project names match without regard to case ("kbyte" and "KBYTE" are one project).
 /// </summary>
-public sealed class SiteHub(EventLog log)
+public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     private const int SubscriberBuffer = 256;
 
     private readonly Lock _gate = new();
@@ -31,9 +33,11 @@ public sealed class SiteHub(EventLog log)
         lock (_gate)
         {
             var name = project ?? LatestLocked();
-            return name is not null && _projects.TryGetValue(name, out var entry) ? entry.State : SiteState.Empty;
+            return name is not null && _projects.TryGetValue(name, out var entry) ? Served(entry.State) : SiteState.Empty;
         }
     }
+
+    private SiteState Served(SiteState state) => Silence.Drop(state, _clock.GetUtcNow());
 
     /// <summary>Most recently active first.</summary>
     public IReadOnlyList<ProjectInfo> Projects
@@ -45,14 +49,17 @@ public sealed class SiteHub(EventLog log)
                 return _projects
                     .OrderByDescending(p => p.Value.LastSeen)
                     .ThenBy(p => p.Key, StringComparer.Ordinal)
-                    .Select(p => new ProjectInfo(p.Key, p.Value.LastSeen, p.Value.State.Actors.Count, [.. p.Value.State.Gates.Values]))
+                    .Select(p => new ProjectInfo(p.Key, p.Value.LastSeen, Served(p.Value.State).Actors.Count, [.. p.Value.State.Gates.Values]))
                     .ToArray();
             }
         }
     }
 
-    /// <summary>Rebuilds every project from one day's log. Returns how many lines were skipped as unreadable.</summary>
-    public int Load(DateOnly day)
+    /// <summary>
+    /// Rebuilds every project from one day's log. <paramref name="keep"/> can leave events out of the
+    /// replay (they stay in the log). Returns how many lines were skipped as unreadable.
+    /// </summary>
+    public int Load(DateOnly day, Func<SiteEvent, bool>? keep = null)
     {
         var result = log.Read(day);
         lock (_gate)
@@ -60,7 +67,10 @@ public sealed class SiteHub(EventLog log)
             _projects = _projects.Clear();
             foreach (var e in result.Events)
             {
-                ApplyLocked(e);
+                if (keep is null || keep(e))
+                {
+                    ApplyLocked(e);
+                }
             }
         }
 
@@ -100,7 +110,7 @@ public sealed class SiteHub(EventLog log)
         {
             _subscribers.Add(channel);
             var name = project ?? LatestLocked();
-            snapshot = name is not null && _projects.TryGetValue(name, out var entry) ? entry.State : SiteState.Empty;
+            snapshot = name is not null && _projects.TryGetValue(name, out var entry) ? Served(entry.State) : SiteState.Empty;
         }
 
         return new Subscription(snapshot, channel.Reader, () =>

@@ -115,6 +115,27 @@ public sealed class SiteAppTests : IAsyncLifetime
         await Task.CompletedTask;
     }
 
+    [Fact]
+    public async Task Restart_LeavesOutGatesOfAStatusFileNoLongerWatched()
+    {
+        var data = Path.Combine(_dir, "replay");
+        var old = new EventLog(data);
+        var folder = new Actor("folder", Roles.Chief);
+        old.Append(SiteEvent.Create(Sources.Folder, "ancosSantiye", folder, EventKinds.GatePending, piece: "santiye-f8"));
+        old.Append(SiteEvent.Create(Sources.Folder, "kbyte", folder, EventKinds.GatePending, piece: "kbyte-003"));
+        old.Append(SiteEvent.Create(Sources.ClaudeCode, "ancosSantiye", Ev.Chief, EventKinds.StageChanged,
+            data: new Dictionary<string, string> { ["stage"] = "F8" }));
+        var profile = new AncosSantiye.Profiles.Profile(
+            FolderLane: new AncosSantiye.Profiles.FolderLaneProfile(Path.Combine(_dir, "nolane"), "x.md", "KBYTE"));
+
+        await using var app = SiteApp.Build([], data, "http://127.0.0.1:0", profile);
+        var hub = app.Services.GetRequiredService<SiteHub>();
+
+        Assert.Empty(hub.StateOf("ancosSantiye").Gates);
+        Assert.Equal("F8", hub.StateOf("ancosSantiye").Stage);
+        Assert.Single(hub.StateOf("kbyte").Gates);
+    }
+
     private const string Hook = """{"hook_event_name":"SubagentStart","cwd":"/p/demo","agent_id":"agent_1","agent_type":"Explore"}""";
 
     private static StringContent Json(string body) => new(body, System.Text.Encoding.UTF8, "application/json");

@@ -8,9 +8,10 @@ public sealed class SiteHubTests : IDisposable
     private static readonly DateTimeOffset Start = new(2026, 11, 26, 10, 0, 0, TimeSpan.Zero);
 
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "santiye-hub-" + Guid.NewGuid());
+    private readonly FixedClock _clock = new(Start.AddMinutes(1));
     private readonly SiteHub _hub;
 
-    public SiteHubTests() => _hub = new SiteHub(new EventLog(_dir));
+    public SiteHubTests() => _hub = new SiteHub(new EventLog(_dir), _clock);
 
     public void Dispose()
     {
@@ -93,11 +94,39 @@ public sealed class SiteHubTests : IDisposable
     {
         _hub.Publish(In("kbyte", 0, EventKinds.GatePending, "kbyte-003", ("label", "Plan")));
         _hub.Publish(In("rovans", 1, EventKinds.ToolStart, null, ("tool", "Read")));
-        var fresh = new SiteHub(new EventLog(_dir));
+        var fresh = new SiteHub(new EventLog(_dir), _clock);
 
         fresh.Load(DateOnly.FromDateTime(Start.UtcDateTime));
 
         Assert.Equal(["rovans", "kbyte"], fresh.Projects.Select(p => p.Name));
+        Assert.Single(fresh.StateOf("kbyte").Gates);
+    }
+
+    [Fact]
+    public void SilentWorkers_AreNotServed_ButStayInTheState()
+    {
+        _hub.Publish(In("kbyte", 0, EventKinds.ToolStart, null, ("tool", "Read")));
+        _clock.Now = Start.AddMinutes(16);
+
+        Assert.Empty(_hub.StateOf("kbyte").Actors);
+        Assert.Empty(_hub.Subscribe("kbyte").Snapshot.Actors);
+        Assert.Equal(0, _hub.Projects[0].Workers);
+
+        _clock.Now = Start.AddMinutes(14);
+        Assert.Single(_hub.StateOf("kbyte").Actors);
+    }
+
+    [Fact]
+    public void Load_CanLeaveEventsOut()
+    {
+        _hub.Publish(SiteEvent.Create(Sources.Folder, "ancosSantiye", new Actor("folder", Roles.Chief), EventKinds.GatePending,
+            piece: "santiye-f8", ts: Start));
+        _hub.Publish(In("kbyte", 1, EventKinds.GatePending, "kbyte-003", ("label", "Plan")));
+        var fresh = new SiteHub(new EventLog(_dir), _clock);
+
+        fresh.Load(DateOnly.FromDateTime(Start.UtcDateTime), e => e.Source != Sources.Folder);
+
+        Assert.Empty(fresh.StateOf("ancosSantiye").Gates);
         Assert.Single(fresh.StateOf("kbyte").Gates);
     }
 

@@ -136,6 +136,14 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Panel: says where the numbers come from and how old they are ("terminal status line, 3 min ago"), shows only the values it has, hides a 5 hour or 7 day window whose reset time has passed, and grays everything out with "(old)" after 15 minutes. With no data at all it says why: Budget comes from the status line, which only runs in a terminal session.
 - Claude checked: `check.sh` green (251 tests). 2 mutations caught (replaced not merged, usage time). Headless Chrome: a desktop-only project showed the explanation; a terminal status line post showed context, the 5 hour bar, cost, tokens and model, with the past 7 day window hidden; data 20 minutes old rendered as "(old)" at 0.45 opacity. No console errors.
 
+## 2026-11-26 v0.2 #6: cleanup
+
+- Silent workers leave: `Silence.Drop` removes an actor whose last event is older than 15 minutes (60 when it is waiting for you). It runs when the state is served (`SiteHub` with a `TimeProvider`), so the reducer and the log never see clock time. The page asks for the state every minute even without events, so they really go.
+- `SiteHub.Load` takes a filter. At start, folder lane events of a project the profile does not watch stay out of the replay (still in the log), so a status file nobody reads any more cannot keep a gate waiting and alerting.
+- `hooks install` says loudly when it kept an existing status line: Budget stays empty, and the two ways to fix it (replace it, or pass its input on to `ancos-santiye statusline`).
+- Version 0.2.0.
+- Claude checked: `check.sh` green (256 tests). 7 mutations caught (waiting lasts longer, same state when nothing left, served state and snapshot drop silent workers, load filter, unwatched folder gates left out, the install note).
+
 ## Problems
 
 | Problem | Cause | Fix |
@@ -150,6 +158,7 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 | A second `ancos-santiye` printed a long Kestrel stack trace (found by Esat while trying the package) | The port was held by an earlier `dotnet run`; Kestrel only fails at bind time | Start checks every port first and stops with one line that says to open the running one |
 | `dotnet pack` made no package | The Web SDK sets `IsPackable` to false | `<IsPackable>true</IsPackable>` |
 | Precompressed files still in the package after `CompressionEnabled` was set to false | A stale `obj/Release` from the earlier pack | Delete `obj/Release` before packing (in Lessons) |
+| `SiteHubTests` would have started failing at 10:15 UTC the same day | The tests use fixed event times, and serving the state now reads the clock to drop silent workers | `FixedClock` in the tests; lesson in CLAUDE.md |
 | A mutation of the first-tick skip passed | The test read the state version after the first tick, so it could not see events published during that tick | The test asserts version 0 after the first tick |
 | `dotnet run` listened on `localhost:5087`, not `127.0.0.1:5170` | The template's `launchSettings.json` sets the URL, so the code default was skipped | Deleted `launchSettings.json` |
 

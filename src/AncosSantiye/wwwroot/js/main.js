@@ -161,6 +161,9 @@ if (demoMode) {
     location.assign(url);
   });
 
+  // Workers who went quiet leave on the server's clock, so ask again now and then even without events.
+  setInterval(refresh, 60000);
+
   setupActions(document.getElementById("actions"));
   connect({
     project: pinned,

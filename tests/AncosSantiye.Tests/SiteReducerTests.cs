@@ -263,4 +263,19 @@ public class SiteReducerTests
         Assert.Equal(new DateTimeOffset(2026, 11, 24, 20, 0, 9, TimeSpan.Zero), s.UsageUpdated);
         Assert.Contains("\"usageUpdated\"", Json(s));
     }
+
+    [Fact]
+    public void Silence_DropsQuietWorkers_WaitingOnesLater()
+    {
+        var s = SiteReducer.Replay([
+            Ev.At(0, EventKinds.ToolStart, Ev.Worker("busy"), data: ("tool", "Read")),
+            Ev.At(0, EventKinds.TurnStop),
+        ]);
+        var start = s.Actors["chief"].LastSeen;
+
+        Assert.Same(s, Silence.Drop(s, start.AddMinutes(14)));
+        Assert.Equal(["chief"], Silence.Drop(s, start.AddMinutes(16)).Actors.Keys);
+        Assert.Equal(["chief"], Silence.Drop(s, start.AddMinutes(59)).Actors.Keys);
+        Assert.Empty(Silence.Drop(s, start.AddMinutes(61)).Actors);
+    }
 }

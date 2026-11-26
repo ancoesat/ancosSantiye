@@ -66,6 +66,7 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 - A command that writes a user's config accepts exact argument shapes only. A typo must never fall back to the real file. (F2 review.)
 - Settings files are refused, not repaired, when the parts we touch have an unexpected shape, comments or duplicate keys. Always back up before writing.
 - Do not add `Properties/launchSettings.json`. It overrides the loopback default URL.
+- A test with fixed event times must use a fixed clock (`FixedClock`) for anything served through `SiteHub`. With the real clock it passes today and fails after 15 minutes of event time. (v0.2 #6.)
 - Before packing, delete `src/AncosSantiye/obj/Release`: a stale obj kept precompressed `.br`/`.gz` files in the package after compression was turned off. (F8.)
 - An Origin check against `request.Host` is only as good as the host filter in front of it. Test the filter with a foreign Host and a matching Origin. (F7 review.)
 - `@{u}` is not always where `git push` goes; `@{push}` is. If git cannot name it, do not push. (F7 review.)
@@ -75,8 +76,7 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 
 - Found in the first real use (2026-11-26):
   - Budget only fills from an interactive terminal `claude` session. The desktop app's Code tab and `claude -p` never run the status line, and hooks carry no usage data. Since v0.2 #5 the panel says so instead of showing empty rows.
-  - Workers from sessions that ended without `session.end` (app closed, login expired) stay idle on the site forever. Needs a timeout.
-  - The day's log replay brings back folder lane gates from a project the current profile no longer watches (santiye-f8 stayed "waiting" under the kbyte profile). Since v0.2 #4 they stay inside their own project and no longer mix in, but they still alert and count as waiting until the next day.
+  - Fixed in v0.2 #6: silent workers leave (15 min, 60 when waiting for you); folder lane events of a project the profile no longer watches stay out of the startup replay.
 
 - Delivery ids (`project-NNN`) and status file ids are separate id spaces; a delivery shows as its own piece.
 - A `Kestrel:Endpoints` setting (appsettings or `Kestrel__Endpoints__*` env) overrides `UseUrls` and skips the loopback check. Close it by checking the real bound addresses after start.

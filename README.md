@@ -151,7 +151,7 @@ The design log, every problem met on the way and how it was fixed, is in [DEVLOG
 ## Known gaps
 
 - The Budget panel comes from the Claude Code status line, which only runs in an interactive terminal session. Sessions in the desktop app or `claude -p` show up on the site, but not in Budget.
-- A worker whose session ended without saying so (app closed, login expired) stays on the site until the next day.
+- A worker that says nothing for 15 minutes (60 when it is waiting for you) leaves the site. If its session was only quiet, it walks back in with its next action.
 - Hooks and the status line always point at port 5170, even if you start the server with `--urls` on another port.
 - OpenCode and other tools have no adapter yet; use the folder lane for them.
 

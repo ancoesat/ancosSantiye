@@ -90,7 +90,12 @@ public static class SiteApp
 
         var app = builder.Build();
 
-        var skipped = hub.Load(DateOnly.FromDateTime(DateTime.UtcNow));
+        // A status file the profile no longer watches can never clear its gates, so its old folder
+        // events stay out of the replay. They are still in the log.
+        var watched = profile.FolderLane?.Project;
+        var skipped = hub.Load(
+            DateOnly.FromDateTime(DateTime.UtcNow),
+            e => e.Source != Sources.Folder || string.Equals(e.Project, watched, StringComparison.OrdinalIgnoreCase));
         if (skipped > 0)
         {
             app.Logger.LogWarning("Skipped {Count} unreadable lines in today's event log", skipped);

@@ -70,4 +70,29 @@ public class CliTests
     {
         Assert.Equal(expected, Cli.IsServerStart(args));
     }
+
+    [Fact]
+    public async Task Install_SaysLoudlyWhenAnExistingStatusLineWasKept()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "santiye-cli-" + Guid.NewGuid());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var settings = Path.Combine(dir, "settings.json");
+            File.WriteAllText(settings, """{ "statusLine": { "type": "command", "command": "my-line.sh" } }""");
+            var output = new StringWriter();
+
+            var code = await Cli.Run(["hooks", "install", "--settings", settings], new StringReader(""), output, new StringWriter());
+
+            Assert.Equal(0, code);
+            Assert.Contains("NOTE: you already have a status line", output.ToString());
+            Assert.Contains("Budget panel stays empty", output.ToString());
+            Assert.Contains("| ancos-santiye statusline", output.ToString());
+            Assert.Contains("my-line.sh", File.ReadAllText(settings));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
 }
