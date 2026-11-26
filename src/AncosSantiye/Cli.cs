@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json;
+using System.Net.Http.Json;
 using AncosSantiye.Adapters;
+using AncosSantiye.Events;
 
 namespace AncosSantiye;
 
@@ -19,6 +21,9 @@ public static class Cli
             case ["hook"]:
                 await Forward(stdin, url);
                 return 0;
+
+            case ["doctor"]:
+                return await Doctor(stdout, url);
 
             case ["hooks", "print"]:
                 stdout.WriteLine(HookInstaller.Print(HookInstaller.Snippet(url)));
@@ -48,7 +53,7 @@ public static class Cli
     }
 
     public const string Usage =
-        "Usage: ancos-santiye [--urls <url>] [--profile <file>] | statusline | hook | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]";
+        "Usage: ancos-santiye [--urls <url>] [--profile <file>] | doctor | statusline | hook | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]";
 
     /// <summary>No arguments, or only server options like --urls. Help flags are not a server start.</summary>
     public static bool IsServerStart(string[] args) =>
@@ -103,6 +108,48 @@ public static class Cli
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
         }
+    }
+
+    /// <summary>
+    /// The same report as the setup page. Asks the running server first (it also knows the last events);
+    /// without a server it looks on its own and says so.
+    /// </summary>
+    private static async Task<int> Doctor(TextWriter stdout, string url)
+    {
+        IReadOnlyList<Setup.ToolReport>? reports = null;
+        try
+        {
+            using var http = new HttpClient(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(2) };
+            reports = await http.GetFromJsonAsync<List<Setup.ToolReport>>(url + "/diagnose", EventJson.Options);
+            stdout.WriteLine($"ancosSantiye server: running at {url}");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            stdout.WriteLine($"ancosSantiye server: not running at {url} (start it with: ancos-santiye)");
+        }
+
+        reports ??= Setup.Diagnose.Detect(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Environment.GetEnvironmentVariable("PATH"), url);
+        stdout.WriteLine();
+        foreach (var r in reports.Where(r => r.Found))
+        {
+            var last = r.LastEvent is { } at ? $", last event {at.ToLocalTime():yyyy-MM-dd HH:mm}" : "";
+            stdout.WriteLine($"{r.Name}: {r.Status}{last}");
+            stdout.WriteLine($"  found by: {string.Join(", ", r.FoundBy)}");
+            foreach (var note in r.Notes)
+            {
+                stdout.WriteLine($"  - {note}");
+            }
+        }
+
+        var missing = reports.Where(r => !r.Found).Select(r => r.Name).ToList();
+        if (missing.Count > 0)
+        {
+            stdout.WriteLine();
+            stdout.WriteLine($"Not found: {string.Join(", ", missing)}");
+        }
+
+        return 0;
     }
 
     private static int Report(HookInstaller.Result result, string verb, TextWriter stdout, TextWriter stderr)

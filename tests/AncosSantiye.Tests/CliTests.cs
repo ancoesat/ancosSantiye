@@ -110,4 +110,16 @@ public class CliTests
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), $"took {watch.Elapsed}");
         Assert.False(Cli.IsServerStart(["hook"]));
     }
+
+    [Fact]
+    public async Task Doctor_AlwaysAnswers_WithOrWithoutAServer()
+    {
+        var output = new StringWriter();
+
+        var code = await Cli.Run(["doctor"], new StringReader(""), output, new StringWriter());
+
+        Assert.Equal(0, code);
+        Assert.Contains("ancosSantiye server:", output.ToString());
+        Assert.False(Cli.IsServerStart(["doctor"]));
+    }
 }

@@ -298,3 +298,17 @@ main {
 /* Budget older than 15 minutes: still shown, clearly not current. */
 .panel.stale .bar,
 .panel.stale .stat { opacity: 0.45; }
+
+/* Header link and the setup page */
+.nav { color: var(--quiet); font-size: 13px; text-decoration: none; margin-left: auto; margin-right: 12px; }
+.nav:hover { color: var(--text); }
+main.setup { display: block; max-width: 760px; }
+.tool { padding: 10px 0; border-top: 1px solid #2c3038; }
+.tool-head { display: flex; gap: 10px; align-items: center; }
+.badge { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #2a2e36; }
+.badge.ok { color: var(--ok); }
+.badge.warn { color: #ffd479; }
+.badge.quiet { color: var(--quiet); }
+.tool .note { margin: 4px 0 0; font-size: 13px; }
+code { font-size: 12px; background: #2a2e36; padding: 1px 5px; border-radius: 3px; }
+.nav + #connection { margin-left: 0; }

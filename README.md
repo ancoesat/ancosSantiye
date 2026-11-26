@@ -64,6 +64,10 @@ dotnet run --project src/AncosSantiye
 
 If the server is not running, Claude Code carries on as usual: the hooks give up after 2 seconds and the status line says `santiye off`.
 
+## Setup and diagnose
+
+Open http://127.0.0.1:5170/setup.html (the "Setup" link in the header), or run `ancos-santiye doctor` in a terminal. It looks for AI coding tools on this computer (Claude Code, OpenCode, Antigravity CLI, Codex, Gemini CLI, Cursor agent, Aider, Qwen Code) by their program on PATH and their config folder, and for each one says whether ancosSantiye is connected, when its last event came in, and what is missing. It only reads; it changes nothing.
+
 ## Profiles
 
 Without a profile you get the built-in skin, Claude Code data only, and a read-only screen. A profile is a small JSON file (comments allowed):

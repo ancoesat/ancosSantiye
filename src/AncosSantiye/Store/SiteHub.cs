@@ -31,6 +31,17 @@ public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
     // a cd in a command) and the hook's cwd moves with it; the session's work still belongs here.
     private ImmutableDictionary<string, string> _sessionProject = ImmutableDictionary<string, string>.Empty;
 
+    private ImmutableDictionary<string, DateTimeOffset> _lastBySource = ImmutableDictionary<string, DateTimeOffset>.Empty;
+
+    /// <summary>When an event from this source (claude-code, folder, ...) last arrived, if ever.</summary>
+    public DateTimeOffset? LastEventFrom(string source)
+    {
+        lock (_gate)
+        {
+            return _lastBySource.TryGetValue(source, out var at) ? at : null;
+        }
+    }
+
     private ImmutableDictionary<string, ImmutableQueue<SiteEvent>> _recent =
         ImmutableDictionary.Create<string, ImmutableQueue<SiteEvent>>(StringComparer.OrdinalIgnoreCase);
 
@@ -176,6 +187,11 @@ public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
         }
 
         _recent = _recent.SetItem(e.Project, queue);
+
+        if (!_lastBySource.TryGetValue(e.Source, out var last) || e.Ts > last)
+        {
+            _lastBySource = _lastBySource.SetItem(e.Source, e.Ts);
+        }
     }
 
     private string? LatestLocked() =>

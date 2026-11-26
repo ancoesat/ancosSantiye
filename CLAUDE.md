@@ -25,6 +25,7 @@ Planning docs (R1, R2, R3): https://claude.ai/artifact/78unfekyyMxxhwxRZgeu1o
 | `src/AncosSantiye/Scene/` | `SiteState` and the reducer (pure function, no I/O) |
 | `src/AncosSantiye/Adapters/` | Claude Code hooks and status line feed, folder lane, status file parser |
 | `src/AncosSantiye/Actions/` | Commit and push, only when `actions.enabled` is true |
+| `src/AncosSantiye/Setup/` | Diagnose: finds AI tools (PATH, config folders), reads their integration, read only (`/diagnose`, `ancos-santiye doctor`, `/setup.html`) |
 | `src/AncosSantiye/Profiles/` | Profile model: skin, folder lane, actions switch (`--profile <file>`) |
 | `src/AncosSantiye/wwwroot/` | No-build front end: plain ES modules, Canvas 2D, EventSource |
 | `src/AncosSantiye/skins/grafxkid/` | CC0 sprites, their licenses, `skin.json` |

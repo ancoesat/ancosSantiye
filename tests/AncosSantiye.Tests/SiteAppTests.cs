@@ -163,6 +163,19 @@ public sealed class SiteAppTests : IAsyncLifetime
         Assert.Equal(AncosSantiye.Scene.Saying.Thinking, state.Actors["chief:s1"].Say);
     }
 
+    [Fact]
+    public async Task Diagnose_ListsTheKnownTools_WithTheLastClaudeEvent()
+    {
+        await _http.PostAsync("/hooks/claude", Json(Hook));
+
+        using var doc = JsonDocument.Parse(await _http.GetStringAsync("/diagnose"));
+        var tools = doc.RootElement.EnumerateArray().ToList();
+
+        Assert.Contains(tools, t => t.GetProperty("id").GetString() == "agy");
+        var claude = tools.Single(t => t.GetProperty("id").GetString() == "claude-code");
+        Assert.Equal(JsonValueKind.String, claude.GetProperty("lastEvent").ValueKind);
+    }
+
     private const string Hook = """{"hook_event_name":"SubagentStart","cwd":"/p/demo","agent_id":"agent_1","agent_type":"Explore"}""";
 
     private static StringContent Json(string body) => new(body, System.Text.Encoding.UTF8, "application/json");

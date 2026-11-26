@@ -124,6 +124,14 @@ public static class SiteApp
         app.MapGet("/projects", (SiteHub h) => TypedResults.Ok(h.Projects));
         app.MapGet("/state", (SiteHub h, string? project) => TypedResults.Ok(h.StateOf(project)));
         app.MapGet("/activity", (SiteHub h, string? project) => TypedResults.Ok(h.RecentOf(project)));
+
+        // Which AI tools are on this machine and how far each is connected. Read only.
+        app.MapGet("/diagnose", (SiteHub h, HttpRequest request) =>
+            TypedResults.Ok(Setup.Diagnose.Detect(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    Environment.GetEnvironmentVariable("PATH"),
+                    $"{request.Scheme}://{request.Host.Value}")
+                .Select(r => r.Id == "claude-code" ? r with { LastEvent = h.LastEventFrom(Sources.ClaudeCode) } : r)));
         app.MapGet("/events", (SiteHub h, string? project, CancellationToken ct) => TypedResults.ServerSentEvents(Stream(h, project, ct)));
 
         // Claude Code hooks. Answer at once: an HTTP hook blocks Claude Code until it returns.

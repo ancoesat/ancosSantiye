@@ -177,6 +177,14 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Version 0.2.4. Needs `ancos-santiye hooks install` once for the new hook.
 - Claude checked: `check.sh` green (296 tests). 6 mutations caught (only lanes are workers, only a real notification, only final statuses, only real ids, the endpoint ends finished jobs, a prompt sets thinking).
 
+## 2026-11-26 v0.3 P1: diagnose
+
+- Esat's direction for v0.3: stay in the browser (a Windows app would add comfort, not reach: what ancosSantiye can see depends on each tool's integration points, not on how it is packaged), connect OpenCode and the Antigravity CLI, start with a setup screen that finds the AI tools on the machine.
+- `Setup/Diagnose.cs`: looks for Claude Code, OpenCode, agy, Codex, Gemini CLI, Cursor agent, Aider and Qwen Code by program on PATH (with the Windows launcher extensions) and by config folder, shown from `~` so the home folder's name never appears. For Claude Code it reads `~/.claude/settings.json` the way `HookInstaller` writes it: missing hooks, the old http SessionStart entry, no status line or someone else's. Read only, tested to write nothing.
+- `SiteHub.LastEventFrom(source)`; `GET /diagnose` adds the last Claude Code event. `ancos-santiye doctor` asks the running server and falls back to its own look when there is none. `/setup.html` shows one card per tool; a "Setup" link in the header.
+- Facts gathered for the next steps: OpenCode plugins live in `~/.config/opencode/plugin/` and get `tool.execute.before/after`, `session.idle`, `todo.updated`; agy hooks live in `~/.gemini/config/hooks.json`, command handlers only, events SessionStart, PreToolUse, PostToolUse, PreInvocation, PostInvocation, Stop, session id `conversationId`.
+- Claude checked: `check.sh` green (307 tests). 7 mutations; one survived (a try/catch around a broken PATH entry), which showed the code was dead: `File.Exists` never throws there. Removed; the test keeps a broken entry. Headless: the setup page and `doctor` with a fake home (Claude Code with its own status line, OpenCode folder, agy on PATH, a Codex folder).
+
 ## Problems
 
 | Problem | Cause | Fix |
