@@ -122,6 +122,13 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Page: the header says "2 of 4 tasks done / now: Build match screen". Without an orchestra stage, open tasks mean "building" and a fully done list means a finished building; no tasks means no building. When a project has no pieces, the side panel shows "Tasks" with each task, done, now or open.
 - Claude checked: `check.sh` green (238 tests). 6 mutations caught; two survived first (a repeated create after completion, creation order) and got stronger tests. Headless Chrome with four real task hooks and a secret in `task_description`: header, building and task panel right, the secret nowhere in the state, no console errors.
 
+## 2026-11-26 v0.2 #2: the place and the animation match the action
+
+- Why: the main session's worker played its "work" sheet all the time, and for some characters that sheet is a walk or a carry, so it looked like walking in circles. Nothing on screen told reading from editing.
+- Reducer: `ActorState.Action` from the tool (`Doing.Of`): read (Read, Grep, Glob, web), build (Write, Edit), run (Bash, PowerShell), plan (task list, subagents, skills, MCP), wait (a stopped turn, or a question to you), fail, start. Between two tools the action stays, so nobody walks back and forth after every tool.
+- Page (`cast.js`): one station per action. Read at the board by the gate, build on the roof (at the walls before there are floors), run at the crane controls, plan at the site office; wait, start and fail at the worker's own spot. A second person at a station stands next to the first. On arrival a worker faces its work. Only a builder at the building plays "work"; everyone else stands still, so a walk always means the agent changed what it does. The supplier stays by its truck.
+- Claude checked: `check.sh` green (250 tests). 6 mutations caught (read, build and run tools, place kept between tools, wait after the turn, fail is its own place). Headless Chrome, one session through Read, Edit, Bash and Stop: the worker went to the board, the roof, the crane and its own spot. No console errors.
+
 ## Problems
 
 | Problem | Cause | Fix |

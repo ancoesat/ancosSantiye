@@ -18,11 +18,17 @@ const GROUND = {
 };
 const IDLE_POOL = [238, 300, 86, 52, 226];
 
-const BUILDERS = new Set(["worker", "subcontractor"]);
+// Where each kind of action happens (see Doing in SiteState.cs). x is the first place, step the next
+// one for a second person there, faceLeft where they look. Building has its own rule below.
+const STATIONS = {
+  read: { x: 288, step: -10, faceLeft: false }, // at the board by the gate
+  run: { x: 60, step: -12, faceLeft: false }, // at the crane controls
+  plan: { x: 262, step: -10, faceLeft: true }, // at the site office
+};
 
-// The people on screen. Follows SiteState.actors: newcomers walk in from the left,
-// leavers walk out. Builders who are working climb the scaffold and stand on top of the
-// building; everyone else waits on the ground beside it.
+// The people on screen. Follows SiteState.actors: newcomers walk in from the left, leavers walk out.
+// Each one stands where its current action happens, and only a builder at the building plays "work".
+// Moving only happens between stations, so every walk means the agent changed what it does.
 export class Cast {
   constructor(skin) {
     this.skin = skin;
@@ -40,17 +46,32 @@ export class Cast {
     const roofY = groundY - FLOOR_HEIGHT * floors;
     const list = Object.values(actors ?? {}).sort((a, b) => a.id.localeCompare(b.id));
 
-    const onRoof = floors > 0 ? list.filter((a) => BUILDERS.has(a.role) && a.activity === "working") : [];
-    const roofGap = onRoof.length > 1 ? (BUILDING_RIGHT - BUILDING_LEFT) / (onRoof.length - 1) : 0;
+    // The supplier always stays by its truck: deliveries are its only job.
+    const actionOf = (actor) => (actor.role === "supplier" ? null : actor.action);
+    const builders = list.filter((a) => actionOf(a) === "build");
+    const gap = builders.length > 1 ? (BUILDING_RIGHT - BUILDING_LEFT) / (builders.length - 1) : 0;
+    const taken = {};
     let idle = 0;
 
     const ids = new Set();
     for (const actor of list) {
       ids.add(actor.id);
-      const roofIndex = onRoof.indexOf(actor);
-      const spot = roofIndex >= 0
-        ? { x: onRoof.length === 1 ? (BUILDING_LEFT + BUILDING_RIGHT) / 2 : BUILDING_LEFT + roofIndex * roofGap, y: roofY }
-        : { x: GROUND[actor.role] ?? IDLE_POOL[idle++ % IDLE_POOL.length], y: groundY };
+      const action = actionOf(actor);
+      let spot;
+      if (action === "build") {
+        // On the roof when there are floors, at the walls when there are none yet.
+        const index = builders.indexOf(actor);
+        const x = builders.length === 1 ? (BUILDING_LEFT + BUILDING_RIGHT) / 2 : BUILDING_LEFT + index * gap;
+        spot = { x, y: floors > 0 ? roofY : groundY, faceLeft: false };
+      } else if (STATIONS[action]) {
+        const station = STATIONS[action];
+        const n = taken[action] ?? 0;
+        taken[action] = n + 1;
+        spot = { x: station.x + n * station.step, y: groundY, faceLeft: station.faceLeft };
+      } else {
+        // Waiting, starting, failed or unknown: its own place, standing still.
+        spot = { x: GROUND[actor.role] ?? IDLE_POOL[idle++ % IDLE_POOL.length], y: groundY, faceLeft: false };
+      }
 
       let member = this.members.get(actor.id);
       if (!member) {
@@ -82,7 +103,10 @@ export class Cast {
 
   // Plans a walk from where the member is now. Changing level always goes by the ladder on the scaffold.
   route(member, spot) {
-    if (member.goal && member.goal.x === spot.x && member.goal.y === spot.y) return;
+    if (member.goal && member.goal.x === spot.x && member.goal.y === spot.y) {
+      member.goal = spot;
+      return;
+    }
     member.goal = spot;
     member.path = member.y === spot.y
       ? [spot]
@@ -110,13 +134,18 @@ export class Cast {
         }
       }
 
+      // Arrived: look at the work (the board, the machine, the office), not where it came from.
+      if (!member.path.length && member.goal && typeof member.goal.faceLeft === "boolean") {
+        member.facingLeft = member.goal.faceLeft;
+      }
+
       if (member.leaving && !member.path.length) this.members.delete(id);
     }
   }
 
   animFor(member) {
     if (member.path.length) return "walk";
-    return member.actor.activity === "working" ? "work" : "idle";
+    return member.actor.action === "build" && member.actor.activity === "working" ? "work" : "idle";
   }
 
   draw(ctx, ms) {

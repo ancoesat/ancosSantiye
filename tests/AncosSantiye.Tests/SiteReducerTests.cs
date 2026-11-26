@@ -211,4 +211,42 @@ public class SiteReducerTests
         Assert.Contains("\"tasksDone\":0", json);
         Assert.Contains("\"currentTask\":\"Plan\"", json);
     }
+
+    [Theory]
+    [InlineData("Read", Doing.Read)]
+    [InlineData("Grep", Doing.Read)]
+    [InlineData("WebSearch", Doing.Read)]
+    [InlineData("Edit", Doing.Build)]
+    [InlineData("Write", Doing.Build)]
+    [InlineData("Bash", Doing.Run)]
+    [InlineData("PowerShell", Doing.Run)]
+    [InlineData("AskUserQuestion", Doing.Wait)]
+    [InlineData("Task", Doing.Plan)]
+    [InlineData("TodoWrite", Doing.Plan)]
+    [InlineData("mcp__github__x", Doing.Plan)]
+    public void Action_FollowsTheTool(string tool, string action)
+    {
+        var s = SiteReducer.Replay([Ev.At(0, EventKinds.ToolStart, data: ("tool", tool))]);
+
+        Assert.Equal(action, s.Actors["chief"].Action);
+    }
+
+    [Fact]
+    public void Action_StaysBetweenTools_AndWaitsAfterTheTurn()
+    {
+        var s = SiteReducer.Replay([
+            Ev.At(0, EventKinds.SessionStart),
+            Ev.At(1, EventKinds.ToolStart, data: ("tool", "Edit")),
+            Ev.At(2, EventKinds.ToolEnd, data: ("tool", "Edit")),
+        ]);
+
+        Assert.Equal(Doing.Build, s.Actors["chief"].Action);
+
+        s = SiteReducer.Reduce(s, Ev.At(3, EventKinds.ToolFail, data: ("tool", "Bash")));
+        Assert.Equal(Doing.Fail, s.Actors["chief"].Action);
+
+        s = SiteReducer.Reduce(s, Ev.At(4, EventKinds.TurnStop));
+        Assert.Equal(Doing.Wait, s.Actors["chief"].Action);
+        Assert.Equal(Doing.Start, SiteReducer.Replay([Ev.At(0, EventKinds.SessionStart)]).Actors["chief"].Action);
+    }
 }

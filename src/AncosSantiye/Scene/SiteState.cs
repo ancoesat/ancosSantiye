@@ -10,6 +10,30 @@ public static class Activities
     public const string Failed = "failed";
 }
 
+/// <summary>
+/// What kind of thing an actor is doing, so the page can put it in the right place: reading at the board,
+/// building on the building, running at the machine, planning at the office, waiting at its own spot.
+/// </summary>
+public static class Doing
+{
+    public const string Start = "start";
+    public const string Read = "read";
+    public const string Build = "build";
+    public const string Run = "run";
+    public const string Plan = "plan";
+    public const string Wait = "wait";
+    public const string Fail = "fail";
+
+    public static string Of(string? tool) => tool switch
+    {
+        "Read" or "Grep" or "Glob" or "LS" or "WebFetch" or "WebSearch" or "NotebookRead" => Read,
+        "Write" or "Edit" or "MultiEdit" or "NotebookEdit" => Build,
+        "Bash" or "PowerShell" or "BashOutput" or "Monitor" or "KillShell" => Run,
+        "AskUserQuestion" => Wait,
+        _ => Plan,
+    };
+}
+
 /// <summary>Bubble lines the reducer sets itself; tool lines come from the adapter.</summary>
 public static class Saying
 {
@@ -24,7 +48,8 @@ public sealed record ActorState(
     string Activity,
     string? Tool,
     DateTimeOffset LastSeen,
-    string? Say = null);
+    string? Say = null,
+    string? Action = null);
 
 public sealed record PieceState(string Id, string Status, string? Verdict, DateTimeOffset Updated);
 

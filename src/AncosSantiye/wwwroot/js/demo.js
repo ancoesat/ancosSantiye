@@ -19,13 +19,13 @@ function demoUsage() {
 }
 
 export function demoState(name) {
-  const actor = (id, role, name, activity, say = null) => ({ id, role, name, activity, say });
+  const actor = (id, role, name, activity, say = null, action = null) => ({ id, role, name, activity, say, action });
   const actors = {
-    chief: actor("chief", "chief", "Claude Code", "idle", "Waiting for you"),
-    a1: actor("a1", "worker", "Explore", "working", "Reading SPEC.md"),
-    a2: actor("a2", "worker", "Plan", "idle", "Calling Explore"),
-    ds: actor("ds", "subcontractor", "DeepSeek", "working", "Editing panels.js"),
-    rv: actor("rv", "inspector", "denetci", "idle", "Searching the code"),
+    chief: actor("chief", "chief", "Claude Code", "idle", "Waiting for you", "wait"),
+    a1: actor("a1", "worker", "Explore", "working", "Reading SPEC.md", "read"),
+    a2: actor("a2", "worker", "Plan", "idle", "Calling Explore", "plan"),
+    ds: actor("ds", "subcontractor", "DeepSeek", "working", "Editing panels.js", "build"),
+    rv: actor("rv", "inspector", "denetci", "working", "Run the unit tests", "run"),
     gm: actor("gm", "supplier", "Gemini", "idle"),
   };
   const piece = (id, status, verdict = null, minutes = 0) => ({

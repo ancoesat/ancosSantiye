@@ -15,12 +15,12 @@ public static class SiteReducer
     {
         var next = e.Kind switch
         {
-            EventKinds.SessionStart or EventKinds.AgentStart => SetActor(state, e, Activities.Idle, tool: null, Saying.Starting),
-            EventKinds.TurnStop => SetActor(state, e, Activities.Idle, tool: null, Saying.Waiting),
-            // The bubble keeps the last action between two tools, so it does not flicker.
-            EventKinds.ToolEnd => SetActor(state, e, Activities.Idle, tool: null, state.Actors.GetValueOrDefault(e.Actor.Id)?.Say),
-            EventKinds.ToolStart => SetActor(state, e, Activities.Working, Value(e, "tool"), Value(e, "say") ?? UsingTool(e)),
-            EventKinds.ToolFail => SetActor(state, e, Activities.Failed, Value(e, "tool"), "Failed: " + (Value(e, "say") ?? UsingTool(e))),
+            EventKinds.SessionStart or EventKinds.AgentStart => SetActor(state, e, Activities.Idle, tool: null, Saying.Starting, Doing.Start),
+            EventKinds.TurnStop => SetActor(state, e, Activities.Idle, tool: null, Saying.Waiting, Doing.Wait),
+            // Between two tools the bubble and the place stay, so nothing flickers or walks back and forth.
+            EventKinds.ToolEnd => SetActor(state, e, Activities.Idle, tool: null, Previous(state, e)?.Say, Previous(state, e)?.Action),
+            EventKinds.ToolStart => SetActor(state, e, Activities.Working, Value(e, "tool"), Value(e, "say") ?? UsingTool(e), Doing.Of(Value(e, "tool"))),
+            EventKinds.ToolFail => SetActor(state, e, Activities.Failed, Value(e, "tool"), "Failed: " + (Value(e, "say") ?? UsingTool(e)), Doing.Fail),
             EventKinds.SessionEnd or EventKinds.AgentStop => state with { Actors = state.Actors.Remove(e.Actor.Id) },
             EventKinds.TaskCreated => AddTask(state, e),
             EventKinds.TaskCompleted => CompleteTask(state, e),
@@ -42,9 +42,11 @@ public static class SiteReducer
 
     private static string UsingTool(SiteEvent e) => $"Using {Value(e, "tool") ?? "a tool"}";
 
-    private static SiteState SetActor(SiteState state, SiteEvent e, string activity, string? tool, string? say)
+    private static ActorState? Previous(SiteState state, SiteEvent e) => state.Actors.GetValueOrDefault(e.Actor.Id);
+
+    private static SiteState SetActor(SiteState state, SiteEvent e, string activity, string? tool, string? say, string? action)
     {
-        var actor = new ActorState(e.Actor.Id, e.Actor.Role, e.Actor.Name, activity, tool, e.Ts, say);
+        var actor = new ActorState(e.Actor.Id, e.Actor.Role, e.Actor.Name, activity, tool, e.Ts, say, action);
         return state with { Actors = state.Actors.SetItem(actor.Id, actor) };
     }
 
