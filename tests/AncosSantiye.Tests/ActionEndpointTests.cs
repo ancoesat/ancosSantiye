@@ -72,6 +72,19 @@ public sealed class ActionEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TheSetupToken_NeverOpensActions()
+    {
+        await Start(enabled: true);
+        using var doc = JsonDocument.Parse(await _http.GetStringAsync("/config"));
+        var setupToken = doc.RootElement.GetProperty("setupToken").GetString();
+        Assert.NotEqual(await Token(), setupToken);
+
+        using var response = await _http.SendAsync(Post("/actions/status", new { repo = 0 }, _origin, setupToken));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Off_HasNoTokenAndNoEndpoints()
     {
         await Start(enabled: false);

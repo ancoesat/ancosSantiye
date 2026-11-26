@@ -269,7 +269,7 @@ public static class ClaudeHookMapper
     /// <c>planItems</c> with its length, and <c>planDone</c>, <c>planStart</c>, <c>planAdvance</c> for the
     /// small updates. Step titles are the agent's own short words, cut like a bubble line.
     /// </summary>
-    private static void AddPlan(Dictionary<string, string> data, JsonElement input)
+    internal static void AddPlan(Dictionary<string, string> data, JsonElement input)
     {
         if (input.ValueKind != JsonValueKind.Object)
         {
@@ -351,6 +351,9 @@ public static class ClaudeHookMapper
         return line.Length <= MaxSay ? line : line[..(MaxSay - 3)] + "...";
     }
 
+    /// <summary>A bubble line cut to <see cref="MaxSay"/>, the one rule every adapter shares.</summary>
+    internal static string Cap(string line) => line.Length <= MaxSay ? line : line[..(MaxSay - 3)] + "...";
+
     private static string? Field(JsonElement input, string name) =>
         input.ValueKind == JsonValueKind.Object ? Text(input, name) : null;
 
@@ -358,7 +361,7 @@ public static class ClaudeHookMapper
         Field(input, field) is { } path ? ProjectName(path) : "a file";
 
     /// <summary>First line only, so a long description never turns into a wall of text.</summary>
-    private static string? Short(string? text) =>
+    internal static string? Short(string? text) =>
         text?.Split('\n')[0].Trim() is { Length: > 0 } line ? line : null;
 
     private static string Host(string? url) =>
@@ -385,6 +388,6 @@ public static class ClaudeHookMapper
                 _ => Roles.Worker,
             }, agentType);
 
-    private static string? Text(JsonElement e, string name) =>
+    internal static string? Text(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && v.GetString() is { Length: > 0 } s ? s : null;
 }

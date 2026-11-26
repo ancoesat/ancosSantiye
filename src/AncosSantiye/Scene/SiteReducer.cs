@@ -49,7 +49,29 @@ public static class SiteReducer
             _ => null,
         };
 
+        if (next is not null && SelfReporting(e))
+        {
+            next = DropStandIns(next, e);
+        }
+
         return next is null ? state : next with { Version = state.Version + 1 };
+    }
+
+    /// <summary>An agent that sends its own hooks (agy, OpenCode), not a job Claude only started.</summary>
+    private static bool SelfReporting(SiteEvent e) =>
+        e.Source is Sources.Agy or Sources.OpenCode && e.Kind is not (EventKinds.AgentStop or EventKinds.SessionEnd);
+
+    /// <summary>
+    /// Claude's background job of the same program stood in for this agent until it reported itself.
+    /// Now the real one is on the site, so the stand-in goes: one worker per run, not two.
+    /// </summary>
+    private static SiteState DropStandIns(SiteState state, SiteEvent e)
+    {
+        var standIns = state.Actors
+            .Where(a => a.Key.StartsWith("job:", StringComparison.Ordinal)
+                        && string.Equals(a.Value.Name, e.Actor.Name, StringComparison.OrdinalIgnoreCase))
+            .Select(a => a.Key).ToArray();
+        return standIns.Length == 0 ? state : state with { Actors = state.Actors.RemoveRange(standIns) };
     }
 
     private static string UsingTool(SiteEvent e) => $"Using {Value(e, "tool") ?? "a tool"}";
@@ -60,6 +82,14 @@ public static class SiteReducer
         // Only lanes are workers. A wait or a dev server in the background is something Claude waits on,
         // not someone working: it stays a line in Activity.
         if (Value(e, "lane") is not { } lane)
+        {
+            return state;
+        }
+
+        // The program already reports itself (its hooks came before Claude's result did): no stand-in.
+        if (state.Actors.Any(a => !a.Key.StartsWith("job:", StringComparison.Ordinal)
+                                  && a.Value.Role == Roles.Subcontractor
+                                  && string.Equals(a.Value.Name, lane, StringComparison.OrdinalIgnoreCase)))
         {
             return state;
         }

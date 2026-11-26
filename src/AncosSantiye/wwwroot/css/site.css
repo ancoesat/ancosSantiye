@@ -1,5 +1,16 @@
+/* Anco Heist by Mehmet Esat Comlekci, SIL Open Font License 1.1 (fonts/OFL.txt). Display text only. */
+@font-face {
+  font-family: "Anco Heist";
+  src: url("/fonts/AncoHeist-Black.woff2") format("woff2");
+  font-weight: 900;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
+  --display: "Anco Heist", system-ui, sans-serif;
+  --accent: #c9a27a;
+  --line: #2c3039;
   --bg: #15171c;
   --panel: #1f2229;
   --text: #e6e6e6;
@@ -24,8 +35,28 @@ header {
   display: flex;
   gap: 16px;
   align-items: center;
-  padding: 8px 16px;
-  background: var(--panel);
+  padding: 10px 20px;
+  background: linear-gradient(180deg, #23262e, var(--panel));
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 2px 0 rgba(201, 162, 122, 0.25);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  text-decoration: none;
+}
+.brand img { display: block; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)); }
+.brand span {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  text-shadow: 0 2px 0 #000;
 }
 
 #project { color: var(--quiet); }
@@ -50,13 +81,20 @@ main {
   align-items: flex-start;
 }
 
-#stage { position: relative; line-height: 0; }
+#stage {
+  position: relative;
+  line-height: 0;
+}
 
 /* Pixel art: integer scale, no smoothing. The scale itself is set from main.js. */
 #site {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   display: block;
+  /* outline, not border: a border would shrink the box and break the integer pixel scale. */
+  outline: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
 
 #tags { position: absolute; inset: 0; pointer-events: none; }
@@ -108,16 +146,20 @@ main {
 
 .panel {
   background: var(--panel);
-  border-radius: 6px;
-  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
 }
 
 .panel h2 {
-  margin: 0 0 8px;
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--quiet);
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
 }
 
 .panel-controls {
@@ -140,7 +182,7 @@ main {
 }
 
 .panel-controls button:hover {
-  border-color: #5a6272;
+  border-color: var(--accent);
 }
 
 .meta {
@@ -252,6 +294,8 @@ main {
 .panel details summary h2 {
   display: inline;
   margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .activity {
@@ -301,7 +345,7 @@ main {
 
 /* Header link and the setup page */
 .nav { color: var(--quiet); font-size: 13px; text-decoration: none; margin-left: auto; margin-right: 12px; }
-.nav:hover { color: var(--text); }
+.nav:hover { color: var(--accent); }
 main.setup { display: block; max-width: 760px; }
 .tool { padding: 10px 0; border-top: 1px solid #2c3038; }
 .tool-head { display: flex; gap: 10px; align-items: center; }
@@ -312,3 +356,21 @@ main.setup { display: block; max-width: 760px; }
 .tool .note { margin: 4px 0 0; font-size: 13px; }
 code { font-size: 12px; background: #2a2e36; padding: 1px 5px; border-radius: 3px; }
 .nav + #connection { margin-left: 0; }
+
+.tool-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.tool-actions button {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid #3a3f4a;
+  border-radius: 4px;
+  background: #2a2e36;
+  color: var(--text);
+  cursor: pointer;
+}
+.tool-actions button.primary { border-color: var(--accent); color: var(--accent); }
+.tool-actions button:hover { border-color: var(--accent); }
+.tool-actions button:disabled { opacity: 0.5; cursor: default; }
+.tool-actions .meta { margin: 0; }
+.meta.ok { color: var(--ok); }
+.meta.off { color: var(--off); }

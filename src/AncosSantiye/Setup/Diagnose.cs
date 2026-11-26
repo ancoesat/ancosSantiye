@@ -57,7 +57,8 @@ public static class Diagnose
             var (status, notes) = tool.Id switch
             {
                 "claude-code" when found => ClaudeCode(home, serverUrl),
-                "opencode" or "agy" when found => (ToolStatus.NotConnected, (IReadOnlyList<string>)["Adapter coming in the next step of v0.3."]),
+                "agy" when found => Safely(() => AgyHooks.Check(home)),
+                "opencode" when found => Safely(() => OpenCodePlugin.Check(home, serverUrl)),
                 _ when found => (ToolStatus.NotSupported, (IReadOnlyList<string>)[]),
                 _ => (ToolStatus.Missing, (IReadOnlyList<string>)[]),
             };
@@ -74,7 +75,7 @@ public static class Diagnose
         var path = Path.Combine(home, ".claude", "settings.json");
         if (!File.Exists(path))
         {
-            return (ToolStatus.NotConnected, ["No ~/.claude/settings.json yet. Run: ancos-santiye hooks install"]);
+            return (ToolStatus.NotConnected, ["No ~/.claude/settings.json yet. Run: ancos-santiye connect claude-code"]);
         }
 
         JsonObject? root;
@@ -111,18 +112,18 @@ public static class Diagnose
         var notes = new List<string>();
         if (missing.Count > 0)
         {
-            notes.Add($"Missing hooks: {string.Join(", ", missing)}. Run: ancos-santiye hooks install");
+            notes.Add($"Missing hooks: {string.Join(", ", missing)}. Run: ancos-santiye connect claude-code");
         }
 
         if (oldHttpStart)
         {
-            notes.Add("SessionStart still has the old http entry, which never fires. Run: ancos-santiye hooks install");
+            notes.Add("SessionStart still has the old http entry, which never fires. Run: ancos-santiye connect claude-code");
         }
 
         var statusLine = root?["statusLine"] as JsonObject;
         if (statusLine is null)
         {
-            notes.Add("No status line: the Budget panel stays empty. Run: ancos-santiye hooks install");
+            notes.Add("No status line: the Budget panel stays empty. Run: ancos-santiye connect claude-code");
         }
         else if (Str(statusLine, "command") != HookInstaller.StatusLineCommand)
         {
@@ -132,6 +133,19 @@ public static class Diagnose
         notes.Add("Budget data only comes from terminal sessions (claude); the desktop app does not run the status line.");
         var status = missing.Count == 0 ? ToolStatus.Connected : missing.Count < ClaudeHookMapper.Kinds.Count ? ToolStatus.Partly : ToolStatus.NotConnected;
         return (status, notes);
+    }
+
+    /// <summary>One config file that cannot be read (locked on Windows, no permission) must not break the whole report.</summary>
+    public static (string, IReadOnlyList<string>) Safely(Func<(string, IReadOnlyList<string>)> check)
+    {
+        try
+        {
+            return check();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return (ToolStatus.NotConnected, [$"Its config could not be read: {ex.Message}"]);
+        }
     }
 
     /// <summary>A program on PATH, with the Windows launcher extensions (agy.exe, opencode.cmd).</summary>

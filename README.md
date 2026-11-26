@@ -12,6 +12,7 @@ It runs on your machine only: a small .NET server on `127.0.0.1` and one page in
 
 - **The site:** a chief, workers, a subcontractor, an inspector, an architect and a supplier truck, each tied to a real agent role. Workers climb to the roof while they work, wait on the ground when idle, and walk off when their session ends.
 - **Speech bubbles:** each worker says what it is doing right now ("Reading SPEC.md", "Run the unit tests", "Waiting for you").
+- **agy and OpenCode on their own:** connect the Antigravity CLI and OpenCode (terminal and desktop app) once, and every run of them on this computer shows up as a subcontractor, in any folder, whether Claude started it or you did. OpenCode's todo list counts as the project's task list.
 - **Background lanes:** when Claude starts another tool in the background (agy, OpenCode, Gemini CLI, Codex...), it shows up as its own subcontractor working on the building, with Claude's description of the job. It leaves when the job's completion notice reaches Claude, when Claude stops it (`TaskStop`), when its session ends, or when the same lane runs again. Other background commands (a wait, a dev server) are not workers; they show up in Activity.
 - **Places that mean something:** reading and searching happen at the board by the gate, editing on the building (on the roof once it has floors), commands at the crane controls, planning and calling helpers at the site office. Waiting means standing still at its own spot. A worker only walks when it starts doing something else.
 - **Progress from the task list:** when Claude Code keeps a task list (TaskCreate in the terminal, the plan in the desktop app), the header shows "2 of 4 tasks done / now: ...", each task is a block on the building, and the side panel lists the tasks. Without a task list (or an orchestra status file) there is no building: nothing is pretended.
@@ -58,7 +59,7 @@ dotnet run --project src/AncosSantiye
    ancos-santiye hooks install
    ```
 
-   This adds HTTP hooks and the status line to `~/.claude/settings.json` (SessionStart becomes a small `ancos-santiye hook` command, because Claude Code runs only commands there). It backs the file up first (timestamped `.bak` next to it), keeps every hook and setting you already have, and keeps an existing status line instead of replacing it. Want to see what it adds before it adds it? `ancos-santiye hooks print`. To remove it: `ancos-santiye hooks uninstall`. Another settings file: `--settings <path>`.
+   (Same as `ancos-santiye connect claude-code`.) This adds HTTP hooks and the status line to `~/.claude/settings.json` (SessionStart becomes a small `ancos-santiye hook` command, because Claude Code runs only commands there). It backs the file up first (timestamped `.bak` next to it), keeps every hook and setting you already have, and keeps an existing status line instead of replacing it. Want to see what it adds before it adds it? `ancos-santiye hooks print`. To remove it: `ancos-santiye hooks uninstall`. Another settings file: `--settings <path>`.
 
 3. Start a Claude Code session. A worker walks onto the site.
 
@@ -66,7 +67,17 @@ If the server is not running, Claude Code carries on as usual: the hooks give up
 
 ## Setup and diagnose
 
-Open http://127.0.0.1:5170/setup.html (the "Setup" link in the header), or run `ancos-santiye doctor` in a terminal. It looks for AI coding tools on this computer (Claude Code, OpenCode, Antigravity CLI, Codex, Gemini CLI, Cursor agent, Aider, Qwen Code) by their program on PATH and their config folder, and for each one says whether ancosSantiye is connected, when its last event came in, and what is missing. It only reads; it changes nothing.
+Open http://127.0.0.1:5170/setup.html (the "Setup" link in the header), or run `ancos-santiye doctor` in a terminal. It looks for AI coding tools on this computer (Claude Code, OpenCode, Antigravity CLI, Codex, Gemini CLI, Cursor agent, Aider, Qwen Code) by their program on PATH and their config folder, and for each one says whether ancosSantiye is connected, when its last event came in, and what is missing.
+
+Three tools can be connected, with the Connect button on that page (it asks first) or in a terminal:
+
+| Tool | Command | What it writes |
+|---|---|---|
+| Claude Code | `ancos-santiye connect claude-code` | Hooks and the status line in `~/.claude/settings.json` (same as `hooks install`) |
+| Antigravity CLI (agy) | `ancos-santiye connect agy` | One `"ancos-santiye"` entry in the user-level `~/.gemini/config/hooks.json`, so it works in every folder. Each hook runs `ancos-santiye hook --from agy --event <name>` |
+| OpenCode | `ancos-santiye connect opencode` | The plugin file `~/.config/opencode/plugins/ancos-santiye.js`, loaded by the terminal and the desktop app. Restart OpenCode once |
+
+`disconnect <tool>` removes only ancosSantiye's own entries. JSON files are backed up first and refused (left as they are) when they hold comments or duplicate keys; a plugin file without ancosSantiye's first line is never overwritten or deleted. The page refreshes the card, and "last event" shows when the first event came in.
 
 ## Profiles
 
@@ -140,7 +151,9 @@ How it is guarded: the endpoints do not exist unless actions are on. Every reque
 ## Security and privacy
 
 - The server only listens on loopback (`127.0.0.1` or `localhost`) and refuses to start on any other address.
-- Write endpoints for Claude Code refuse requests that carry an `Origin` header (a browser) and anything that is not JSON.
+- Hook endpoints (Claude Code, agy, OpenCode) refuse requests that carry an `Origin` header (a browser) and anything that is not JSON.
+- The Connect buttons write other tools' config files, so `/setup/connect` and `/setup/disconnect` need the page's own Origin, JSON and a per-start token of their own (a different one from commit and push). Add `/setup/*` to your agent's deny list (see the example in [siyametrik-skills](https://github.com/ancoesat/siyametrik-skills)).
+- From agy only the tool name, a file's last segment and whether it failed are read; never the command, the prompt (`lastUserInput`) or the transcript. The OpenCode plugin sends only the tool name, a file's last segment, the tool's own short description, todo titles and statuses, and session ids.
 - Events never carry code, diffs, file contents or secrets. Only names, ids, counts and statuses. Long values are cut at 200 characters.
 - Events are kept as one NDJSON file per day in `~/.ancos-santiye/events`. Delete the folder whenever you like.
 
@@ -159,7 +172,9 @@ The design log, every problem met on the way and how it was fixed, is in [DEVLOG
 - A worker that says nothing for 15 minutes (60 when it is waiting for you) leaves the site. If its session was only quiet, it walks back in with its next action.
 - Hooks and the status line always point at port 5170, even if you start the server with `--urls` on another port.
 - Claude Code has no hook for a finished background job. ancosSantiye reads the completion notice when it starts a turn (`UserPromptSubmit`); if that does not happen, a lane worker stays up to 30 minutes after its last start.
-- OpenCode or other tools you run yourself (not through Claude) have no adapter yet; use the folder lane for them.
+- Codex, Gemini CLI, Cursor agent, Aider and Qwen Code are found but have no adapter yet; use the folder lane for them.
+- agy's hooks file format and OpenCode's plugin loader are young and still changing. If the setup page says connected but no event ever arrives, run the tool once and check `ancos-santiye doctor`; please open an issue with the tool's version.
+- An agy run leaves the site when its turn ends. OpenCode stays with a "Waiting" bubble when it is idle, like Claude Code.
 
 ## License
 

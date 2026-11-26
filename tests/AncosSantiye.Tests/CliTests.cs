@@ -29,6 +29,28 @@ public class CliTests
     }
 
     [Fact]
+    public async Task AgyHook_ServerDown_StillAnswersWithEmptyJson()
+    {
+        var output = new StringWriter();
+
+        var code = await Cli.Run(["hook", "--from", "agy", "--event", "PreToolUse"], new StringReader("{}"), output, new StringWriter());
+
+        Assert.Equal(0, code);
+        Assert.Equal("{}", output.ToString().Trim());
+    }
+
+    [Theory]
+    [InlineData("hook", "--from", "agy", "--event", "Bogus")]
+    [InlineData("hook", "--from", "codex", "--event", "Stop")]
+    [InlineData("connect", "codex")]
+    [InlineData("disconnect", "everything")]
+    [InlineData("connect")]
+    public async Task WrongShapes_NeverTouchAnything(params string[] args)
+    {
+        Assert.Equal(2, await Cli.Run(args, new StringReader(""), new StringWriter(), new StringWriter()));
+    }
+
+    [Fact]
     public async Task UnknownCommand_ShowsUsage()
     {
         var error = new StringWriter();

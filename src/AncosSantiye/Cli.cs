@@ -19,8 +19,20 @@ public static class Cli
                 return 0;
 
             case ["hook"]:
-                await Forward(stdin, url);
+                await Forward(stdin, url + "/hooks/claude");
                 return 0;
+
+            // agy sends no event name in its payload, so its hooks.json passes one. It reads stdout as JSON.
+            case ["hook", "--from", "agy", "--event", var name] when AgyHookMapper.Events.Contains(name):
+                await Forward(stdin, url + "/hooks/agy?event=" + name);
+                stdout.WriteLine("{}");
+                return 0;
+
+            case ["connect", var tool] when Setup.Connect.Tools.Contains(tool):
+                return Report(Setup.Connect.Run(tool, true, Home, url, DateTimeOffset.Now)!, "installed", stdout, stderr, tool);
+
+            case ["disconnect", var tool] when Setup.Connect.Tools.Contains(tool):
+                return Report(Setup.Connect.Run(tool, false, Home, url, DateTimeOffset.Now)!, "removed", stdout, stderr, tool);
 
             case ["doctor"]:
                 return await Doctor(stdout, url);
@@ -53,7 +65,10 @@ public static class Cli
     }
 
     public const string Usage =
-        "Usage: ancos-santiye [--urls <url>] [--profile <file>] | doctor | statusline | hook | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]";
+        "Usage: ancos-santiye [--urls <url>] [--profile <file>] | doctor | connect <tool> | disconnect <tool> | statusline | hook | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]\n" +
+        "Tools: claude-code, agy, opencode";
+
+    private static string Home => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
     /// <summary>No arguments, or only server options like --urls. Help flags are not a server start.</summary>
     public static bool IsServerStart(string[] args) =>
@@ -96,14 +111,14 @@ public static class Cli
     /// For hook events that Claude Code only runs as a command (SessionStart): pass the payload on to the
     /// server's hook endpoint. Silent and always exit 0, so a server that is down never bothers Claude Code.
     /// </summary>
-    private static async Task Forward(TextReader stdin, string url)
+    private static async Task Forward(TextReader stdin, string endpoint)
     {
         var input = await stdin.ReadToEndAsync();
         try
         {
             using var http = new HttpClient(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromMilliseconds(1500) };
             using var content = new StringContent(input, Encoding.UTF8, "application/json");
-            using var _ = await http.PostAsync(url + "/hooks/claude", content);
+            using var _ = await http.PostAsync(endpoint, content);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
@@ -152,7 +167,7 @@ public static class Cli
         return 0;
     }
 
-    private static int Report(HookInstaller.Result result, string verb, TextWriter stdout, TextWriter stderr)
+    private static int Report(HookInstaller.Result result, string verb, TextWriter stdout, TextWriter stderr, string tool = "claude-code")
     {
         if (result.Error is not null)
         {
@@ -160,7 +175,11 @@ public static class Cli
             return 1;
         }
 
-        stdout.WriteLine(result.Changed ? $"Hooks {verb}." : "Nothing to change.");
+        stdout.WriteLine(result.Changed ? $"{tool}: {verb}." : $"{tool}: nothing to change.");
+        if (result.Changed && tool == "opencode" && verb == "installed")
+        {
+            stdout.WriteLine("Restart OpenCode (terminal or desktop app) once so it loads the plugin.");
+        }
         if (result.BackupPath is not null)
         {
             stdout.WriteLine($"Backup: {result.BackupPath}");

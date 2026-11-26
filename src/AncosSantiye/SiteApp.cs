@@ -109,10 +109,12 @@ public static class SiteApp
         // What the page may show. The token is only here when actions are on, and only this page can read it:
         // another site gets no CORS header, and the host filter stops DNS rebinding.
         var guard = ActionGuard.Create();
+        // The setup buttons get a door of their own: their token never opens commit and push, and the other way round.
+        var setupGuard = ActionGuard.Create();
         var actions = profile.ActionsEnabled ? new GitActions(repos) : null;
         app.MapGet("/config", () => TypedResults.Ok(actions is null
-            ? new { actionsEnabled = false, repos = (IReadOnlyList<string>)[], token = (string?)null }
-            : new { actionsEnabled = true, repos = actions.Names, token = (string?)guard.Token }));
+            ? new { actionsEnabled = false, repos = (IReadOnlyList<string>)[], token = (string?)null, setupToken = setupGuard.Token }
+            : new { actionsEnabled = true, repos = actions.Names, token = (string?)guard.Token, setupToken = setupGuard.Token }));
 
         if (actions is not null)
         {
@@ -126,12 +128,19 @@ public static class SiteApp
         app.MapGet("/activity", (SiteHub h, string? project) => TypedResults.Ok(h.RecentOf(project)));
 
         // Which AI tools are on this machine and how far each is connected. Read only.
+        // Santiye:Home lets tests point this (and connect) at a temp folder instead of the real home.
+        var home = builder.Configuration["Santiye:Home"] ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         app.MapGet("/diagnose", (SiteHub h, HttpRequest request) =>
-            TypedResults.Ok(Setup.Diagnose.Detect(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    Environment.GetEnvironmentVariable("PATH"),
-                    $"{request.Scheme}://{request.Host.Value}")
-                .Select(r => r.Id == "claude-code" ? r with { LastEvent = h.LastEventFrom(Sources.ClaudeCode) } : r)));
+            TypedResults.Ok(Setup.Diagnose.Detect(home, Environment.GetEnvironmentVariable("PATH"), ServerOptions.DefaultUrl)
+                .Select(r => r.Id switch
+                {
+                    "claude-code" => r with { LastEvent = h.LastEventFrom(Sources.ClaudeCode) },
+                    "agy" => r with { LastEvent = h.LastEventFrom(Sources.Agy) },
+                    "opencode" => r with { LastEvent = h.LastEventFrom(Sources.OpenCode) },
+                    _ => r,
+                })));
+
+        MapSetup(app, setupGuard, home);
         app.MapGet("/events", (SiteHub h, string? project, CancellationToken ct) => TypedResults.ServerSentEvents(Stream(h, project, ct)));
 
         // Claude Code hooks. Answer at once: an HTTP hook blocks Claude Code until it returns.
@@ -163,6 +172,50 @@ public static class SiteApp
             foreach (var finished in ClaudeHookMapper.JobsFinished(body.RootElement, at))
             {
                 h.Publish(finished);
+            }
+
+            return TypedResults.NoContent();
+        });
+
+        // agy hooks, through `ancos-santiye hook --from agy --event <name>` (agy only runs commands).
+        app.MapPost("/hooks/agy", async (HttpRequest request, SiteHub h, string? @event, CancellationToken ct) =>
+        {
+            if (LocalOnly.Reject(request) is { } rejected)
+            {
+                return rejected;
+            }
+
+            using var body = await ReadJson(request, ct);
+            if (body is null)
+            {
+                return TypedResults.BadRequest();
+            }
+
+            if (AgyHookMapper.Map(@event, body.RootElement, DateTimeOffset.UtcNow) is { } e)
+            {
+                h.Publish(e);
+            }
+
+            return TypedResults.NoContent();
+        });
+
+        // Our OpenCode plugin (Setup/Connectors.cs).
+        app.MapPost("/hooks/opencode", async (HttpRequest request, SiteHub h, CancellationToken ct) =>
+        {
+            if (LocalOnly.Reject(request) is { } rejected)
+            {
+                return rejected;
+            }
+
+            using var body = await ReadJson(request, ct);
+            if (body is null)
+            {
+                return TypedResults.BadRequest();
+            }
+
+            if (OpenCodeMapper.Map(body.RootElement, DateTimeOffset.UtcNow) is { } e)
+            {
+                h.Publish(e);
             }
 
             return TypedResults.NoContent();
@@ -208,6 +261,43 @@ public static class SiteApp
         finally
         {
             probe.Stop();
+        }
+    }
+
+    private sealed record ToolRequest(string? Tool);
+
+    /// <summary>
+    /// Connect and disconnect buttons of the setup page. They write other tools' config files, so they need
+    /// the page's own Origin, JSON and a token of their own from /config (no CORS, host filter); agents are
+    /// kept away from /config and /setup/* by the deny list (README). What gets written always points at
+    /// <see cref="ServerOptions.DefaultUrl"/>, like the CLI: never at the request's Host, which a caller picks.
+    /// </summary>
+    private static void MapSetup(WebApplication app, ActionGuard guard, string home)
+    {
+        foreach (var (path, connect) in new[] { ("/setup/connect", true), ("/setup/disconnect", false) })
+        {
+            app.MapPost(path, async (HttpRequest request, CancellationToken ct) =>
+            {
+                if (guard.Reject(request) is { } rejected)
+                {
+                    return rejected;
+                }
+
+                if (await Read<ToolRequest>(request, ct) is not { Tool: { } tool }
+                    || Setup.Connect.Run(tool, connect, home, ServerOptions.DefaultUrl, DateTimeOffset.Now) is not { } result)
+                {
+                    return TypedResults.BadRequest(new { ok = false, message = "Unknown tool." });
+                }
+
+                return result.Error is { } error
+                    ? TypedResults.BadRequest(new { ok = false, message = error })
+                    : TypedResults.Ok(new
+                    {
+                        ok = true,
+                        message = result.Changed ? (connect ? "Connected." : "Disconnected.") : "Nothing to change.",
+                        backup = result.BackupPath?.Replace(home, "~", StringComparison.Ordinal),
+                    });
+            });
         }
     }
 

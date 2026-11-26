@@ -249,7 +249,7 @@ public static class HookInstaller
     private static string? Str(JsonObject o, string name) =>
         o[name] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
 
-    private static (JsonObject? Root, string? Error) Load(string path)
+    internal static (JsonObject? Root, string? Error) Load(string path)
     {
         var info = new FileInfo(path);
         if (info.LinkTarget is not null && info.ResolveLinkTarget(returnFinalTarget: true) is not { Exists: true })
@@ -317,7 +317,7 @@ public static class HookInstaller
     /// leaves half a file. A symlinked settings.json is written through to its target, and on Unix the
     /// original file mode is kept.
     /// </summary>
-    private static Result Save(string path, JsonObject root, DateTimeOffset now)
+    internal static Result Save(string path, JsonObject root, DateTimeOffset now)
     {
         var target = Path.GetFullPath(path);
         string? backup = null;
@@ -348,13 +348,21 @@ public static class HookInstaller
         }
 
         var temp = $"{target}.ancos-santiye-{Guid.NewGuid():N}.tmp";
-        File.WriteAllText(temp, Print(root) + Environment.NewLine);
-        if (mode is { } m && !OperatingSystem.IsWindows())
+        try
         {
-            File.SetUnixFileMode(temp, m);
+            File.WriteAllText(temp, Print(root) + Environment.NewLine);
+            if (mode is { } m && !OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(temp, m);
+            }
+
+            File.Move(temp, target, overwrite: true);
+        }
+        finally
+        {
+            File.Delete(temp); // no-op after the move; never leave half a file next to the user's
         }
 
-        File.Move(temp, target, overwrite: true);
         return new Result(true, backup, null);
     }
 }

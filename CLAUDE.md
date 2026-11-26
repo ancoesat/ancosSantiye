@@ -19,13 +19,13 @@ Planning docs (R1, R2, R3): https://claude.ai/artifact/78unfekyyMxxhwxRZgeu1o
 |---|---|
 | `src/AncosSantiye/Program.cs` | Entry: no args starts the server, otherwise `Cli` |
 | `src/AncosSantiye/SiteApp.cs` | Builds the web app and its endpoints |
-| `src/AncosSantiye/Cli.cs` | `statusline`, `hooks print / install / uninstall` |
+| `src/AncosSantiye/Cli.cs` | `statusline`, `hook [--from agy --event X]`, `doctor`, `connect / disconnect <tool>`, `hooks print / install / uninstall` |
 | `src/AncosSantiye/Events/` | The one event shape every adapter emits |
 | `src/AncosSantiye/Store/` | NDJSON log and in-process event bus |
 | `src/AncosSantiye/Scene/` | `SiteState` and the reducer (pure function, no I/O) |
-| `src/AncosSantiye/Adapters/` | Claude Code hooks and status line feed, folder lane, status file parser |
+| `src/AncosSantiye/Adapters/` | Claude Code hooks and status line feed, agy hooks, OpenCode plugin events, folder lane, status file parser |
 | `src/AncosSantiye/Actions/` | Commit and push, only when `actions.enabled` is true |
-| `src/AncosSantiye/Setup/` | Diagnose: finds AI tools (PATH, config folders), reads their integration, read only (`/diagnose`, `ancos-santiye doctor`, `/setup.html`) |
+| `src/AncosSantiye/Setup/` | Diagnose (finds AI tools, reads their integration) and Connectors (agy hooks.json entry, OpenCode plugin file, the `Connect` door for CLI and `/setup/*`) |
 | `src/AncosSantiye/Profiles/` | Profile model: skin, folder lane, actions switch (`--profile <file>`) |
 | `src/AncosSantiye/wwwroot/` | No-build front end: plain ES modules, Canvas 2D, EventSource |
 | `src/AncosSantiye/skins/grafxkid/` | CC0 sprites, their licenses, `skin.json` |
@@ -52,10 +52,11 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 1. Loopback only. The server binds to 127.0.0.1. Nothing listens on a public interface.
 2. No NuGet packages in `src/`. Framework and standard library only. The test project may use xUnit.
 3. No build step for the front end. No npm, no bundler.
-4. Events never carry code, diffs, file contents or secrets. Only names, ids, counts, statuses. The speech bubble (`ClaudeHookMapper.Say`) may read exactly these parts of `tool_input`: the last segment of a file path, the agent's own `description`, a subagent or skill name, a URL's host. Task hooks may carry `task_id` and `task_subject` (the agent's own short title), never `task_description`. The desktop plan tool (`mcp__ccd_turn__update_plan`) may give each step's `content` and `status`, and `done`, `start`, `advance`; never a step's `session`. For background jobs: `run_in_background`, the job id from the result ("ID: x", nothing else of the result), `description`, and from the command only a whole-word program name on the `Lanes` allowlist (agy, opencode...), never anything else of the command. `UserPromptSubmit`: the prompt is never kept; only from a `<task-notification>` block, a well-formed `<task-id>` and a final `<status>` (completed, failed, killed, stopped). Never a command, pattern, query, prompt or full path; every one of those has a test.
+4. Events never carry code, diffs, file contents or secrets. Only names, ids, counts, statuses. The speech bubble (`ClaudeHookMapper.Say`) may read exactly these parts of `tool_input`: the last segment of a file path, the agent's own `description`, a subagent or skill name, a URL's host. Task hooks may carry `task_id` and `task_subject` (the agent's own short title), never `task_description`. The desktop plan tool (`mcp__ccd_turn__update_plan`) may give each step's `content` and `status`, and `done`, `start`, `advance`; never a step's `session`. For background jobs: `run_in_background`, the job id from the result ("ID: x", nothing else of the result), `description`, and from the command only a whole-word program name on the `Lanes` allowlist (agy, opencode...), never anything else of the command. `UserPromptSubmit`: the prompt is never kept; only from a `<task-notification>` block, a well-formed `<task-id>` and a final `<status>` (completed, failed, killed, stopped). agy (`AgyHookMapper`): `conversationId`, the last folder of the first `workspacePaths` entry, `toolCall.name`, the last segment of a path field in `toolCall.args`, and whether `error` is set; never the command, `lastUserInput`, the transcript or the error text. OpenCode (`OpenCodeMapper`, and the plugin source in `Setup/Connectors.cs` that sends it): kind from a fixed list, session id, project folder name, tool name, a file's last segment, the tool's own `description` (first line, capped), todo `content` and `status`. Never a command, pattern, query, prompt or full path; every one of those has a test.
 5. The reducer in `Scene/` is pure: same events in, same state out. All I/O stays in adapters and the store.
 6. Actions (commit, push) exist only behind `actions.enabled`. When it is false the endpoints are not mapped at all. The page sends a repo index, never a path; every file must be in the server's own `git status`; push is a plain `git push` to `@{push}`, never with arguments. Each request needs the server's own Origin, JSON and the per-start token.
-   Known limit: a local program can read the token from `/config` like the page does. The agent deny list (`siyametrik-skills/claude-code/settings-ornek.json`) blocks `/actions/` and `/config` on localhost; keep actions off when you do not need them.
+   The setup page's Connect and Disconnect (`/setup/connect`, `/setup/disconnect`) write other tools' config files and sit behind a door of their own (own Origin, JSON, their own per-start token `setupToken` from `/config`; it never opens `/actions/*`). They take a tool name from a fixed list, never a path, and always write `ServerOptions.DefaultUrl`, never the request's Host.
+   Known limit: a local program can read the token from `/config` like the page does. The agent deny list (`siyametrik-skills/claude-code/settings-ornek.json`) blocks `/actions/`, `/setup/` and `/config` on localhost; keep actions off when you do not need them.
 7. Sprites come from packs with a license that allows redistribution (CC0 today). Never draw pixel art by hand. Simple shapes in code (rectangles, lines) are fine.
 8. No em or en dashes anywhere: code, comments, docs, UI text.
 9. Git: no commits, pushes or branches from any agent, and no calls to `/actions/*` either. Esat commits and pushes, by terminal or from the screen.
@@ -72,11 +73,13 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 - An Origin check against `request.Host` is only as good as the host filter in front of it. Test the filter with a foreign Host and a matching Origin. (F7 review.)
 - A session's project is where it started; `cwd` in later hooks follows Claude into other folders (briefs, cd). `SiteHub` pins it. (v0.2.2, found in Esat's real log.)
 - SessionStart runs only `command` (and `mcp_tool`) hooks; an `http` entry there never fires. Check each hook event's allowed types in the Claude Code docs before installing it. (v0.2.1, found by a read-only diagnosis run in Claude Code.)
+- A config file of another tool is written only under our own key (agy) or in our own marked file (OpenCode). Anything else in it stays byte for byte; a file we did not write is never replaced. (v0.3.)
 - `@{u}` is not always where `git push` goes; `@{push}` is. If git cannot name it, do not push. (F7 review.)
 - A time limit on a child process must cover reading its pipes too, not only waiting for exit. (F7 review.)
 
 ## Open items
 
+- v0.3 not yet seen live (2026-11-27): does agy run the hooks in `~/.gemini/config/hooks.json` as written (top-level key, `matcher`, `timeout`)? Does OpenCode's desktop app load `~/.config/opencode/plugins/ancos-santiye.js` and call its `server`? `doctor` shows "last event" for each once the first event arrives.
 - Found in the first real use (2026-11-26):
   - Budget only fills from an interactive terminal `claude` session. The desktop app's Code tab and `claude -p` never run the status line, and hooks carry no usage data. Since v0.2 #5 the panel says so instead of showing empty rows.
   - Fixed in v0.2 #6: silent workers leave (15 min, 60 when waiting for you); folder lane events of a project the profile no longer watches stay out of the startup replay.

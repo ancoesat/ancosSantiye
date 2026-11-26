@@ -4,20 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ancosSantiye setup</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/badger-32.png">
+  <link rel="apple-touch-icon" href="/img/badger-180.png">
+  <link rel="preload" href="/fonts/AncoHeist-Black.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/site.css">
 </head>
 <body>
   <header>
-    <strong>ancosSantiye</strong>
+    <a href="/" class="brand"><img src="/img/badger-64.png" width="34" height="34" alt=""><span>ancosSantiye</span></a>
     <a href="/" class="nav">Back to the site</a>
   </header>
   <main class="setup">
     <section class="panel">
       <h2>AI tools on this computer</h2>
-      <p class="meta">Read only: this page looks for programs on PATH and config folders, and checks whether ancosSantiye is connected to each tool. It changes nothing.</p>
+      <p class="meta">This page looks for programs on PATH and config folders and checks whether ancosSantiye is connected to each tool. It changes a file only when you press Connect or Disconnect and confirm.</p>
       <div id="tools"><p class="empty">Looking...</p></div>
-      <p class="meta">The same report in a terminal: <code>ancos-santiye doctor</code></p>
+      <p class="meta">The same in a terminal: <code>ancos-santiye doctor</code>, <code>ancos-santiye connect agy</code></p>
     </section>
   </main>
   <script type="module" src="/js/setup.js"></script>

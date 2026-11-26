@@ -15,6 +15,59 @@ const STATUS_CLASS = {
   "not found": "quiet",
 };
 
+// Tools the server can connect to. The buttons write that tool's config file, so each one asks first.
+const CONNECTABLE = {
+  "claude-code": "adds hooks and a status line to ~/.claude/settings.json (a backup is made first)",
+  agy: "adds an \"ancos-santiye\" entry to ~/.gemini/config/hooks.json (a backup is made first)",
+  opencode: "writes the plugin file ~/.config/opencode/plugins/ancos-santiye.js",
+};
+
+let token = null;
+
+async function call(path, tool) {
+  token ??= (await (await fetch("/config")).json()).setupToken;
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json", "X-Santiye-Token": token },
+    body: JSON.stringify({ tool }),
+  });
+  const body = await response.json().catch(() => ({}));
+  return { ok: response.ok && body.ok, message: body.message ?? `The server answered ${response.status}.`, backup: body.backup };
+}
+
+function buttons(tool) {
+  const what = CONNECTABLE[tool.id];
+  if (!what || !tool.found) return null;
+  const row = make("div", "tool-actions");
+  const result = make("span", "meta");
+  const connected = tool.status === "connected";
+  const run = async (path, question) => {
+    if (!window.confirm(question)) return;
+    for (const b of row.querySelectorAll("button")) b.disabled = true;
+    try {
+      const answer = await call(path, tool.id);
+      result.className = answer.ok ? "meta ok" : "meta off";
+      result.textContent = answer.backup ? `${answer.message} Backup: ${answer.backup}` : answer.message;
+      if (answer.ok) setTimeout(load, 800);
+    } catch {
+      result.className = "meta off";
+      result.textContent = "The server did not answer.";
+    } finally {
+      for (const b of row.querySelectorAll("button")) b.disabled = false;
+    }
+  };
+  const connect = make("button", "primary", connected ? "Connect again" : "Connect");
+  connect.addEventListener("click", () => run("/setup/connect", `Connect ${tool.name}?\n\nThis ${what}.`));
+  row.append(connect);
+  if (tool.status !== "not connected") {
+    const remove = make("button", null, "Disconnect");
+    remove.addEventListener("click", () => run("/setup/disconnect", `Disconnect ${tool.name}?\n\nOnly ancosSantiye's own entries are removed.`));
+    row.append(remove);
+  }
+  row.append(result);
+  return row;
+}
+
 function card(tool) {
   const node = make("div", "tool");
   const head = make("div", "tool-head");
@@ -23,6 +76,8 @@ function card(tool) {
   if (Array.isArray(tool.foundBy) && tool.foundBy.length > 0) node.append(make("p", "meta", `Found: ${tool.foundBy.join(", ")}`));
   if (tool.lastEvent) node.append(make("p", "meta", `Last event: ${new Date(tool.lastEvent).toLocaleString()}`));
   for (const note of Array.isArray(tool.notes) ? tool.notes : []) node.append(make("p", "note", note));
+  const actions = buttons(tool);
+  if (actions) node.append(actions);
   return node;
 }
 

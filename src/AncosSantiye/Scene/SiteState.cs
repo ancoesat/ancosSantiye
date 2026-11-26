@@ -31,8 +31,19 @@ public static class Doing
         "Write" or "Edit" or "MultiEdit" or "NotebookEdit" => Build,
         "Bash" or "PowerShell" or "BashOutput" or "Monitor" or "KillShell" => Run,
         "AskUserQuestion" => Wait,
+        // Planning tools of other agents, before the word rules below could misread them ("todowrite").
+        "TodoWrite" or "todowrite" or "todoread" or "task" => Plan,
+        _ when tool?.StartsWith("mcp__", StringComparison.Ordinal) == true => Plan,
+        // Tools of other agents (OpenCode, agy) by what their names say, in the same order as their bubbles
+        // (AgyHookMapper.Say): a command first, then writing, then reading.
+        _ when HasWord(tool, "bash", "shell", "command", "terminal", "powershell") => Run,
+        _ when HasWord(tool, "write", "edit", "replace", "create", "patch") => Build,
+        _ when HasWord(tool, "read", "view", "grep", "glob", "search", "find", "list", "fetch") => Read,
         _ => Plan,
     };
+
+    private static bool HasWord(string? tool, params string[] words) =>
+        tool is not null && words.Any(w => tool.Contains(w, StringComparison.OrdinalIgnoreCase));
 }
 
 /// <summary>

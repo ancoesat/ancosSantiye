@@ -43,6 +43,7 @@ public static class Sources
 {
     public const string ClaudeCode = "claude-code";
     public const string OpenCode = "opencode";
+    public const string Agy = "agy";
     public const string Folder = "folder";
     public const string Screen = "screen";
 }
