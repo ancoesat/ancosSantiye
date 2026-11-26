@@ -168,6 +168,15 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Reducer: a job works on the building; a new run of the same lane in the same session replaces the old worker; `job.stop` and the session's end remove it. `Silence` gives jobs 60 minutes, since nothing arrives while they run.
 - Claude checked: `check.sh` green (290 tests). 8 mutations caught. The first test run also caught two real flaws: `cat agy.log` read as the agy lane (all extensions were stripped) and `"not an id!"` accepted as a job id (the pattern was not anchored). Headless: agy hammering on the roof with its description while Claude reads at the board.
 
+## 2026-11-26 v0.2.4: background jobs that end
+
+- Seen live: five subcontractors hammering on the roof. Four were not lanes at all ("Wait for the P2 deploy run", "Start local server..."), and none of them ever left, because nothing said their job was over.
+- Only lanes are workers now. A laneless `job.start` stays a line in Activity and the reducer makes no worker of it; replaying the real log of that afternoon leaves only agy.
+- A new `UserPromptSubmit` hook. The docs list scheduled tasks, background subagents and cross-session messages as turns that fire it; background shell notices are not listed, so whether a `<task-notification>` arrives through it is not confirmed yet (the next agy run will show it in the log). From such a prompt only a well-formed `<task-id>` and a final `<status>` are taken, and that job's worker leaves; the prompt itself is never kept. The same hook gives Claude's worker a "Thinking" bubble when a turn starts.
+- `Silence` gives jobs 30 minutes instead of 60.
+- Version 0.2.4. Needs `ancos-santiye hooks install` once for the new hook.
+- Claude checked: `check.sh` green (296 tests). 6 mutations caught (only lanes are workers, only a real notification, only final statuses, only real ids, the endpoint ends finished jobs, a prompt sets thinking).
+
 ## Problems
 
 | Problem | Cause | Fix |

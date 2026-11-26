@@ -18,6 +18,7 @@ public static class SiteReducer
         {
             EventKinds.SessionStart or EventKinds.AgentStart => SetActor(state, e, Activities.Idle, tool: null, Saying.Starting, Doing.Start),
             EventKinds.TurnStop => SetActor(state, e, Activities.Idle, tool: null, Saying.Waiting, Doing.Wait),
+            EventKinds.TurnStart => SetActor(state, e, Activities.Working, tool: null, Saying.Thinking, Doing.Plan),
             // Between two tools the bubble and the place stay, so nothing flickers or walks back and forth.
             EventKinds.ToolEnd => SetActor(state, e, Activities.Idle, tool: null, Previous(state, e)?.Say, Previous(state, e)?.Action),
             EventKinds.ToolStart => ApplyPlan(
@@ -56,10 +57,14 @@ public static class SiteReducer
     /// <summary>A new run of a lane replaces the session's earlier run of the same lane (that one is over).</summary>
     private static SiteState StartJob(SiteState state, SiteEvent e)
     {
-        var lane = Value(e, "lane");
-        var older = lane is null
-            ? []
-            : state.Actors.Where(a => a.Key != e.Actor.Id
+        // Only lanes are workers. A wait or a dev server in the background is something Claude waits on,
+        // not someone working: it stays a line in Activity.
+        if (Value(e, "lane") is not { } lane)
+        {
+            return state;
+        }
+
+        var older = state.Actors.Where(a => a.Key != e.Actor.Id
                     && a.Key.StartsWith($"job:{e.Session ?? ""}:", StringComparison.Ordinal)
                     && string.Equals(a.Value.Name, lane, StringComparison.OrdinalIgnoreCase))
                 .Select(a => a.Key).ToArray();

@@ -23,6 +23,8 @@ public static class ClaudeHookMapper
         ["SubagentStart"] = EventKinds.AgentStart,
         ["SubagentStop"] = EventKinds.AgentStop,
         ["Stop"] = EventKinds.TurnStop,
+        // The prompt itself is never read here; see JobsFinished for the one thing taken from it.
+        ["UserPromptSubmit"] = EventKinds.TurnStart,
         ["TaskCreated"] = EventKinds.TaskCreated,
         ["TaskCompleted"] = EventKinds.TaskCompleted,
     };
@@ -161,6 +163,38 @@ public static class ClaudeHookMapper
     }
 
     private static string JobActor(string? session, string job) => $"job:{session ?? ""}:{job}";
+
+    private static readonly System.Text.RegularExpressions.Regex Finished = new(
+        @"<task-id>([A-Za-z0-9_-]{1,40})</task-id>.{0,600}?<status>(completed|failed|killed|stopped)</status>",
+        System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Claude Code tells the agent that a background job ended with a <c>&lt;task-notification&gt;</c> block,
+    /// which may start a turn of its own. From such a turn only the job's id and final status are taken;
+    /// the prompt text is not kept, logged or passed on. Each finished job's worker leaves.
+    /// </summary>
+    public static IReadOnlyList<SiteEvent> JobsFinished(JsonElement hook, DateTimeOffset at)
+    {
+        if (hook.ValueKind != JsonValueKind.Object
+            || Text(hook, "hook_event_name") != "UserPromptSubmit"
+            || Text(hook, "prompt") is not { } prompt
+            || !prompt.Contains("<task-notification>", StringComparison.Ordinal))
+        {
+            return [];
+        }
+
+        var session = Text(hook, "session_id");
+        return Finished.Matches(prompt)
+            .Select(m => SiteEvent.Create(
+                Sources.ClaudeCode,
+                ProjectName(Text(hook, "cwd")),
+                new Actor(JobActor(session, m.Groups[1].Value), Roles.Subcontractor),
+                EventKinds.JobStop,
+                session: session,
+                data: new Dictionary<string, string> { ["status"] = m.Groups[2].Value },
+                ts: at))
+            .ToArray();
+    }
 
     /// <summary>The background job id from the tool's result: a field if there is one, else "ID: x" in its text.</summary>
     private static string? JobId(JsonElement response)

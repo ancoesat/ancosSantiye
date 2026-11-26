@@ -151,6 +151,16 @@ public sealed class SiteAppTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal("agy", state.Actors["job:s1:j1"].Name);
         Assert.Equal(AncosSantiye.Scene.Activities.Idle, state.Actors["chief:s1"].Activity);
+
+        const string done = """
+            {"session_id":"s1","cwd":"/p/demo","hook_event_name":"UserPromptSubmit",
+             "prompt":"<task-notification>\n<task-id>j1</task-id>\n<status>completed</status>\n</task-notification>"}
+            """;
+        using var finished = await _http.PostAsync("/hooks/claude", Json(done));
+
+        state = _app.Services.GetRequiredService<SiteHub>().StateOf("demo");
+        Assert.False(state.Actors.ContainsKey("job:s1:j1"));
+        Assert.Equal(AncosSantiye.Scene.Saying.Thinking, state.Actors["chief:s1"].Say);
     }
 
     private const string Hook = """{"hook_event_name":"SubagentStart","cwd":"/p/demo","agent_id":"agent_1","agent_type":"Explore"}""";

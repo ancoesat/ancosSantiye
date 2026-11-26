@@ -152,6 +152,11 @@ public static class SiteApp
                 h.Publish(job);
             }
 
+            foreach (var finished in ClaudeHookMapper.JobsFinished(body.RootElement, at))
+            {
+                h.Publish(finished);
+            }
+
             return TypedResults.NoContent();
         });
 

@@ -12,7 +12,7 @@ It runs on your machine only: a small .NET server on `127.0.0.1` and one page in
 
 - **The site:** a chief, workers, a subcontractor, an inspector, an architect and a supplier truck, each tied to a real agent role. Workers climb to the roof while they work, wait on the ground when idle, and walk off when their session ends.
 - **Speech bubbles:** each worker says what it is doing right now ("Reading SPEC.md", "Run the unit tests", "Waiting for you").
-- **Background lanes:** when Claude starts another tool in the background (agy, OpenCode, Gemini CLI, Codex...), it shows up as its own subcontractor working on the building, with Claude's description of the job. It leaves when Claude stops it (`TaskStop`), when its session ends, or when the same lane runs again.
+- **Background lanes:** when Claude starts another tool in the background (agy, OpenCode, Gemini CLI, Codex...), it shows up as its own subcontractor working on the building, with Claude's description of the job. It leaves when the job's completion notice reaches Claude, when Claude stops it (`TaskStop`), when its session ends, or when the same lane runs again. Other background commands (a wait, a dev server) are not workers; they show up in Activity.
 - **Places that mean something:** reading and searching happen at the board by the gate, editing on the building (on the roof once it has floors), commands at the crane controls, planning and calling helpers at the site office. Waiting means standing still at its own spot. A worker only walks when it starts doing something else.
 - **Progress from the task list:** when Claude Code keeps a task list (TaskCreate in the terminal, the plan in the desktop app), the header shows "2 of 4 tasks done / now: ...", each task is a block on the building, and the side panel lists the tasks. Without a task list (or an orchestra status file) there is no building: nothing is pretended.
 - **Side panels:** what is waiting for you, every piece and its status, your context window and plan limits (5 hour and 7 day), and the last events.
@@ -154,7 +154,7 @@ The design log, every problem met on the way and how it was fixed, is in [DEVLOG
 - The Budget panel comes from the Claude Code status line, which only runs in an interactive terminal session. Sessions in the desktop app or `claude -p` show up on the site, but not in Budget.
 - A worker that says nothing for 15 minutes (60 when it is waiting for you) leaves the site. If its session was only quiet, it walks back in with its next action.
 - Hooks and the status line always point at port 5170, even if you start the server with `--urls` on another port.
-- Claude Code sends no hook when a background job finishes on its own, so a lane worker stays up to an hour after its last start unless Claude stops it or runs that lane again.
+- Claude Code has no hook for a finished background job. ancosSantiye reads the completion notice when it starts a turn (`UserPromptSubmit`); if that does not happen, a lane worker stays up to 30 minutes after its last start.
 - OpenCode or other tools you run yourself (not through Claude) have no adapter yet; use the folder lane for them.
 
 ## License

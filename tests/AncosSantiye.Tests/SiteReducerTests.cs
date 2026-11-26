@@ -373,20 +373,28 @@ public class SiteReducerTests
     }
 
     [Fact]
-    public void Jobs_WithoutALane_DoNotReplaceEachOther()
+    public void Jobs_WithoutALane_AreNotWorkers()
     {
         var s = SiteReducer.Replay([Job(0, EventKinds.JobStart, "s1", "d1", null), Job(1, EventKinds.JobStart, "s1", "d2", null)]);
 
-        Assert.Equal(2, s.Actors.Count);
+        Assert.Empty(s.Actors);
     }
 
     [Fact]
-    public void Silence_GivesJobsAnHour()
+    public void APrompt_SetsTheWorkerThinking()
+    {
+        var s = SiteReducer.Replay([Ev.At(0, EventKinds.TurnStop), Ev.At(1, EventKinds.TurnStart)]);
+
+        Assert.Equal((Saying.Thinking, Doing.Plan, Activities.Working), (s.Actors["chief"].Say, s.Actors["chief"].Action, s.Actors["chief"].Activity));
+    }
+
+    [Fact]
+    public void Silence_GivesJobsHalfAnHour()
     {
         var s = SiteReducer.Replay([Job(0, EventKinds.JobStart, "s1", "a1", "agy")]);
         var start = s.Actors["job:s1:a1"].LastSeen;
 
-        Assert.Single(Silence.Drop(s, start.AddMinutes(59)).Actors);
-        Assert.Empty(Silence.Drop(s, start.AddMinutes(61)).Actors);
+        Assert.Single(Silence.Drop(s, start.AddMinutes(29)).Actors);
+        Assert.Empty(Silence.Drop(s, start.AddMinutes(31)).Actors);
     }
 }

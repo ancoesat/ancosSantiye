@@ -124,7 +124,6 @@ public class ClaudeHookMapperTests
     }
 
     [Theory]
-    [InlineData("UserPromptSubmit")]
     [InlineData("Notification")]
     [InlineData("")]
     public void OtherHooks_AreIgnored(string hook)
@@ -319,5 +318,60 @@ public class ClaudeHookMapperTests
         Assert.Equal("job:s1:b1oyll8ht", stop.Actor.Id);
         Assert.Null(ClaudeHookMapper.JobStopped(odd.RootElement, At));
         Assert.Null(ClaudeHookMapper.BackgroundJob(doc.RootElement, At));
+    }
+
+    [Fact]
+    public void APrompt_StartsATurn_WithoutTheText()
+    {
+        var e = Map("""{ "session_id": "s1", "cwd": "/x/rovans", "hook_event_name": "UserPromptSubmit", "prompt": "my SECRET plan" }""")!;
+
+        Assert.Equal(EventKinds.TurnStart, e.Kind);
+        Assert.Equal("chief:s1", e.Actor.Id);
+        Assert.DoesNotContain("SECRET", JsonSerializer.Serialize(e, EventJson.Options));
+    }
+
+    private static IReadOnlyList<SiteEvent> Finished(string prompt)
+    {
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["session_id"] = "s1", ["cwd"] = "/x/rovans", ["hook_event_name"] = "UserPromptSubmit", ["prompt"] = prompt,
+        }));
+        return ClaudeHookMapper.JobsFinished(doc.RootElement, At);
+    }
+
+    [Fact]
+    public void ATaskNotification_SendsItsJobWorkersAway_TakingOnlyIdAndStatus()
+    {
+        const string prompt = """
+            [SYSTEM NOTIFICATION - NOT USER INPUT]
+            <task-notification>
+            <task-id>b1oyll8ht</task-id>
+            <tool-use-id>toolu_SECRET</tool-use-id>
+            <output-file>C:/Users/x/SECRET/b1oyll8ht.output</output-file>
+            <status>completed</status>
+            <summary>Background command "Run SECRET brief on agy" completed (exit code 0)</summary>
+            </task-notification>
+            <task-notification>
+            <task-id>zz9</task-id>
+            <status>failed</status>
+            </task-notification>
+            """;
+
+        var stops = Finished(prompt);
+
+        Assert.Equal(["job:s1:b1oyll8ht", "job:s1:zz9"], stops.Select(s => s.Actor.Id));
+        Assert.All(stops, s => Assert.Equal(EventKinds.JobStop, s.Kind));
+        Assert.Equal(["completed", "failed"], stops.Select(s => s.Data!["status"]));
+        Assert.DoesNotContain("SECRET", JsonSerializer.Serialize(stops, EventJson.Options));
+    }
+
+    [Theory]
+    [InlineData("please check <task-id>abc</task-id> <status>completed</status>")]
+    [InlineData("<task-notification><task-id>bad id!</task-id><status>completed</status></task-notification>")]
+    [InlineData("<task-notification><task-id>abc</task-id><status>running</status></task-notification>")]
+    [InlineData("just a normal prompt")]
+    public void JobsFinished_OnlyFromARealNotification(string prompt)
+    {
+        Assert.Empty(Finished(prompt));
     }
 }

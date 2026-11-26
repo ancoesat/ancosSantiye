@@ -46,7 +46,7 @@ public static class Silence
     public static readonly TimeSpan Waiting = TimeSpan.FromMinutes(60);
 
     /// <summary>A background job sends nothing while it runs and no hook says when it is done.</summary>
-    public static readonly TimeSpan Job = TimeSpan.FromMinutes(60);
+    public static readonly TimeSpan Job = TimeSpan.FromMinutes(30);
 
     private static TimeSpan LimitFor(ActorState a) =>
         a.Id.StartsWith("job:", StringComparison.Ordinal) ? Job : a.Action == Doing.Wait ? Waiting : Working;
@@ -66,6 +66,7 @@ public static class Saying
 {
     public const string Starting = "Getting started";
     public const string Waiting = "Waiting for you";
+    public const string Thinking = "Thinking";
 }
 
 public sealed record ActorState(
