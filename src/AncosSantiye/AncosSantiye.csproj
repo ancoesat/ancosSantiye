@@ -15,7 +15,7 @@
     <!-- dotnet run starts in the project folder by default; start where the user is, like the installed tool. -->
     <RunWorkingDirectory>$(MSBuildStartupDirectory)</RunWorkingDirectory>
     <PackageId>AncosSantiye</PackageId>
-    <Version>0.2.2</Version>
+    <Version>0.2.3</Version>
     <Authors>Mehmet Esat Comlekci</Authors>
     <Description>Watch your AI coding agents build your project as a pixel art construction site.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

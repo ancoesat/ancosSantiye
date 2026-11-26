@@ -23,7 +23,14 @@ public static class SiteReducer
             EventKinds.ToolStart => ApplyPlan(
                 SetActor(state, e, Activities.Working, Value(e, "tool"), Value(e, "say") ?? UsingTool(e), Doing.Of(Value(e, "tool"))), e),
             EventKinds.ToolFail => SetActor(state, e, Activities.Failed, Value(e, "tool"), "Failed: " + (Value(e, "say") ?? UsingTool(e)), Doing.Fail),
-            EventKinds.SessionEnd or EventKinds.AgentStop => state with { Actors = state.Actors.Remove(e.Actor.Id) },
+            EventKinds.AgentStop or EventKinds.JobStop => state with { Actors = state.Actors.Remove(e.Actor.Id) },
+            // A session that ends takes its background jobs with it.
+            EventKinds.SessionEnd => state with
+            {
+                Actors = state.Actors.Remove(e.Actor.Id).RemoveRange(
+                    state.Actors.Keys.Where(k => k.StartsWith($"job:{e.Session ?? ""}:", StringComparison.Ordinal))),
+            },
+            EventKinds.JobStart => StartJob(state, e),
             EventKinds.TaskCreated => AddTask(state, e),
             EventKinds.TaskCompleted => CompleteTask(state, e),
             EventKinds.StageChanged when Value(e, "stage") is { } stage => state with { Stage = stage },
@@ -45,6 +52,20 @@ public static class SiteReducer
     }
 
     private static string UsingTool(SiteEvent e) => $"Using {Value(e, "tool") ?? "a tool"}";
+
+    /// <summary>A new run of a lane replaces the session's earlier run of the same lane (that one is over).</summary>
+    private static SiteState StartJob(SiteState state, SiteEvent e)
+    {
+        var lane = Value(e, "lane");
+        var older = lane is null
+            ? []
+            : state.Actors.Where(a => a.Key != e.Actor.Id
+                    && a.Key.StartsWith($"job:{e.Session ?? ""}:", StringComparison.Ordinal)
+                    && string.Equals(a.Value.Name, lane, StringComparison.OrdinalIgnoreCase))
+                .Select(a => a.Key).ToArray();
+        var cleared = older.Length == 0 ? state : state with { Actors = state.Actors.RemoveRange(older) };
+        return SetActor(cleared, e, Activities.Working, tool: null, Value(e, "say"), Doing.Build);
+    }
 
     private static ActorState? Previous(SiteState state, SiteEvent e) => state.Actors.GetValueOrDefault(e.Actor.Id);
 

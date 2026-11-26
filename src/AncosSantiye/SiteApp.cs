@@ -140,9 +140,16 @@ public static class SiteApp
                 return TypedResults.BadRequest();
             }
 
-            if (ClaudeHookMapper.Map(body.RootElement, DateTimeOffset.UtcNow) is { } e)
+            var at = DateTimeOffset.UtcNow;
+            if (ClaudeHookMapper.Map(body.RootElement, at) is { } e)
             {
                 h.Publish(e);
+            }
+
+            // A job left running in the background is a worker of its own; TaskStop sends it away.
+            if ((ClaudeHookMapper.BackgroundJob(body.RootElement, at) ?? ClaudeHookMapper.JobStopped(body.RootElement, at)) is { } job)
+            {
+                h.Publish(job);
             }
 
             return TypedResults.NoContent();

@@ -160,6 +160,14 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Version 0.2.2.
 - Claude checked: `check.sh` green (271 tests). 3 mutations caught (pin on publish, pin on replay, replay forgets old pins; the last survived first and got a test across two days).
 
+## 2026-11-26 v0.2.3: lanes Claude runs in the background
+
+- Seen live: the rovans session ran rovans-010 on agy (Gemini) with `run_in_background`, and the site showed nothing of it: the Bash call ended after 6 seconds and agy was invisible.
+- Facts from the docs and from the session itself (asked to answer from its own tool definitions, no tools run): Bash has `run_in_background`; the result is text, "Command running in background with ID: <id>. Output is being written to: <path>", or "...moved to the background (ID: <id>)" after a timeout; `TaskStop` takes `task_id`; a finished job reaches the agent as a message in its context, and no hook fires for it.
+- `ClaudeHookMapper.BackgroundJob`: a Bash or PowerShell `PostToolUse` whose result names a background id becomes `job.start` for a subcontractor `job:<session>:<id>`, named after the lane program if the command has one from the allowlist as a whole word (agy, opencode, gemini, codex, aider, qwen, cursor-agent, deepseek; `agy.exe` counts, `agy.log` does not), saying the agent's description. Nothing else of the command or the result is read. `JobStopped`: `TaskStop` with a well-formed id becomes `job.stop`.
+- Reducer: a job works on the building; a new run of the same lane in the same session replaces the old worker; `job.stop` and the session's end remove it. `Silence` gives jobs 60 minutes, since nothing arrives while they run.
+- Claude checked: `check.sh` green (290 tests). 8 mutations caught. The first test run also caught two real flaws: `cat agy.log` read as the agy lane (all extensions were stripped) and `"not an id!"` accepted as a job id (the pattern was not anchored). Headless: agy hammering on the roof with its description while Claude reads at the board.
+
 ## Problems
 
 | Problem | Cause | Fix |

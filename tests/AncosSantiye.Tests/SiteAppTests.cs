@@ -136,6 +136,23 @@ public sealed class SiteAppTests : IAsyncLifetime
         Assert.Single(hub.StateOf("kbyte").Gates);
     }
 
+    [Fact]
+    public async Task HookPost_ABackgroundLane_AddsItsWorker()
+    {
+        const string run = """
+            {"session_id":"s1","cwd":"/p/demo","hook_event_name":"PostToolUse","tool_name":"Bash",
+             "tool_input":{"command":"agy -p x","description":"Run 010 on agy","run_in_background":true},
+             "tool_response":"Command running in background with ID: j1. Output is being written to: f"}
+            """;
+
+        using var response = await _http.PostAsync("/hooks/claude", Json(run));
+        var state = _app.Services.GetRequiredService<SiteHub>().StateOf("demo");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal("agy", state.Actors["job:s1:j1"].Name);
+        Assert.Equal(AncosSantiye.Scene.Activities.Idle, state.Actors["chief:s1"].Activity);
+    }
+
     private const string Hook = """{"hook_event_name":"SubagentStart","cwd":"/p/demo","agent_id":"agent_1","agent_type":"Explore"}""";
 
     private static StringContent Json(string body) => new(body, System.Text.Encoding.UTF8, "application/json");

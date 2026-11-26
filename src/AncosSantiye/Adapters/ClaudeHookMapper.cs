@@ -83,6 +83,146 @@ public static class ClaudeHookMapper
 
     public const int MaxSay = 60;
 
+    /// <summary>
+    /// Programs Claude starts as lanes in the background. Only these names are ever taken from a command,
+    /// as whole words; the rest of the command (arguments, paths, the prompt) is never read out.
+    /// </summary>
+    public static readonly IReadOnlySet<string> Lanes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "agy", "opencode", "gemini", "codex", "aider", "qwen", "cursor-agent", "deepseek",
+    };
+
+    private static readonly System.Text.RegularExpressions.Regex WholeJobId =
+        new(@"^[A-Za-z0-9_-]{1,40}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static readonly System.Text.RegularExpressions.Regex JobIdPattern =
+        new(@"\bID: ([A-Za-z0-9_-]{1,40})\b", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// A Bash or PowerShell call that left a job running in the background (asked for, or moved there after
+    /// its timeout) becomes a subcontractor worker of its own: named after the lane program if it is one,
+    /// saying the agent's own description. Its id is the job id, so <c>TaskStop</c> can end it.
+    /// </summary>
+    public static SiteEvent? BackgroundJob(JsonElement hook, DateTimeOffset at)
+    {
+        if (hook.ValueKind != JsonValueKind.Object
+            || Text(hook, "hook_event_name") != "PostToolUse"
+            || Text(hook, "tool_name") is not ("Bash" or "PowerShell")
+            || !hook.TryGetProperty("tool_response", out var response)
+            || JobId(response) is not { } job)
+        {
+            return null;
+        }
+
+        var input = hook.TryGetProperty("tool_input", out var given) ? given : default;
+        var lane = Lane(Field(input, "command"));
+        var say = Short(Field(input, "description")) ?? (lane is null ? "Running in the background" : $"Running {lane}");
+        say = say.Length <= MaxSay ? say : say[..(MaxSay - 3)] + "...";
+        var data = new Dictionary<string, string> { ["job"] = job, ["say"] = say };
+        if (lane is not null)
+        {
+            data["lane"] = lane;
+        }
+
+        return SiteEvent.Create(
+            Sources.ClaudeCode,
+            ProjectName(Text(hook, "cwd")),
+            new Actor(JobActor(Text(hook, "session_id"), job), Roles.Subcontractor, lane ?? "Background job"),
+            EventKinds.JobStart,
+            session: Text(hook, "session_id"),
+            data: data,
+            ts: at);
+    }
+
+    /// <summary><c>TaskStop</c> (or the older KillShell) on a job we know: its worker leaves.</summary>
+    public static SiteEvent? JobStopped(JsonElement hook, DateTimeOffset at)
+    {
+        if (hook.ValueKind != JsonValueKind.Object
+            || Text(hook, "hook_event_name") != "PreToolUse"
+            || Text(hook, "tool_name") is not ("TaskStop" or "KillShell" or "KillBash")
+            || !hook.TryGetProperty("tool_input", out var input))
+        {
+            return null;
+        }
+
+        var job = Field(input, "task_id") ?? Field(input, "shell_id") ?? Field(input, "bash_id");
+        if (job is null || !WholeJobId.IsMatch(job))
+        {
+            return null;
+        }
+
+        return SiteEvent.Create(
+            Sources.ClaudeCode,
+            ProjectName(Text(hook, "cwd")),
+            new Actor(JobActor(Text(hook, "session_id"), job), Roles.Subcontractor),
+            EventKinds.JobStop,
+            session: Text(hook, "session_id"),
+            ts: at);
+    }
+
+    private static string JobActor(string? session, string job) => $"job:{session ?? ""}:{job}";
+
+    /// <summary>The background job id from the tool's result: a field if there is one, else "ID: x" in its text.</summary>
+    private static string? JobId(JsonElement response)
+    {
+        if (response.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var name in new[] { "backgroundTaskId", "background_task_id", "shellId", "bash_id", "task_id" })
+            {
+                if (Text(response, name) is { Length: > 0 } id && WholeJobId.IsMatch(id))
+                {
+                    return id;
+                }
+            }
+
+            foreach (var property in response.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.String && JobIdIn(property.Value.GetString()) is { } found)
+                {
+                    return found;
+                }
+            }
+
+            return null;
+        }
+
+        return response.ValueKind == JsonValueKind.String ? JobIdIn(response.GetString()) : null;
+    }
+
+    private static string? JobIdIn(string? text) =>
+        text is not null && text.Contains("background", StringComparison.OrdinalIgnoreCase) && JobIdPattern.Match(text) is { Success: true } m
+            ? m.Groups[1].Value
+            : null;
+
+    /// <summary>The first whole word of the command that is a lane program (path and .exe stripped), or null.</summary>
+    public static string? Lane(string? command)
+    {
+        if (command is null)
+        {
+            return null;
+        }
+
+        foreach (var word in command.Split([' ', '\t', '\n', '\r', ';', '&', '|', '(', ')', '"', '\'', '`', '$'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            // Only a program's own extensions come off: "agy.exe" is agy, "agy.log" is a file, not the lane.
+            var name = Path.GetFileName(word.Replace('\\', '/'));
+            foreach (var ext in new[] { ".exe", ".cmd", ".bat", ".ps1" })
+            {
+                if (name.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+                {
+                    name = name[..^ext.Length];
+                }
+            }
+
+            if (Lanes.Contains(name))
+            {
+                return name.ToLowerInvariant();
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>The Claude desktop app keeps its task list with this tool instead of TaskCreate.</summary>
     public const string PlanTool = "mcp__ccd_turn__update_plan";
 

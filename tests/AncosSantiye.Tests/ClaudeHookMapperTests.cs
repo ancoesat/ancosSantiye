@@ -238,4 +238,86 @@ public class ClaudeHookMapperTests
     {
         Assert.Equal(expected, Say(tool, "{}"));
     }
+
+    private const string AgyRun = """
+        { "session_id": "s1", "cwd": "C:\\dev\\rovans", "hook_event_name": "PostToolUse", "tool_name": "Bash",
+          "tool_input": { "command": "cd C:/secret/client && timeout 30m agy -p \"$(cat brief-010.md)\" --model hydrogen > out.log 2>&1",
+                          "description": "Run rovans-010 headless on agy", "run_in_background": true },
+          "tool_response": "Command running in background with ID: b1oyll8ht. Output is being written to: C:/Users/x/AppData/tasks/b1oyll8ht.output" }
+        """;
+
+    [Fact]
+    public void BackgroundLane_BecomesItsOwnWorker_WithNothingFromTheCommandButTheName()
+    {
+        using var doc = JsonDocument.Parse(AgyRun);
+
+        var job = ClaudeHookMapper.BackgroundJob(doc.RootElement, At)!;
+        var json = JsonSerializer.Serialize(job, EventJson.Options);
+
+        Assert.Equal(EventKinds.JobStart, job.Kind);
+        Assert.Equal("job:s1:b1oyll8ht", job.Actor.Id);
+        Assert.Equal(Roles.Subcontractor, job.Actor.Role);
+        Assert.Equal("agy", job.Actor.Name);
+        Assert.Equal("Run rovans-010 headless on agy", job.Data!["say"]);
+        Assert.Equal("rovans", job.Project);
+        foreach (var secret in new[] { "secret", "brief-010", "hydrogen", "out.log", "AppData", "timeout 30m" })
+        {
+            Assert.DoesNotContain(secret, json);
+        }
+    }
+
+    [Theory]
+    [InlineData("\"Command running in background with ID: abc123. Output is being written to: x\"", "abc123")]
+    [InlineData("\"Command did not complete within its 120s timeout and was moved to the background (ID: zz9). Output...\"", "zz9")]
+    [InlineData("{ \"stdout\": \"\", \"backgroundTaskId\": \"obj42\" }", "obj42")]
+    [InlineData("{ \"stdout\": \"Command running in background with ID: inner7. Output\" }", "inner7")]
+    [InlineData("\"total 12\\nID: 5 rows\"", null)]
+    [InlineData("{ \"stdout\": \"done\" }", null)]
+    public void BackgroundJob_IdComesFromTheResult(string response, string? expected)
+    {
+        using var doc = JsonDocument.Parse($$"""
+            { "session_id": "s", "cwd": "/x/p", "hook_event_name": "PostToolUse", "tool_name": "Bash",
+              "tool_input": { "command": "npm run dev", "description": "Start dev server" }, "tool_response": {{response}} }
+            """);
+
+        var job = ClaudeHookMapper.BackgroundJob(doc.RootElement, At);
+
+        Assert.Equal(expected, job?.Data!["job"]);
+        if (job is not null)
+        {
+            Assert.Equal("Background job", job.Actor.Name);
+            Assert.False(job.Data!.ContainsKey("lane"));
+        }
+    }
+
+    [Theory]
+    [InlineData("cd C:/dev && timeout 30m agy -p \"x\"", "agy")]
+    [InlineData("C:\\tools\\agy.exe run", "agy")]
+    [InlineData("/usr/local/bin/opencode run --model x", "opencode")]
+    [InlineData("(GEMINI -p hi)", "gemini")]
+    [InlineData("npm run dev", null)]
+    [InlineData("echo gemini-notes > sagy.txt", null)]
+    [InlineData("cat agy.log", null)]
+    public void Lane_IsAWholeWordFromTheAllowlist(string command, string? lane)
+    {
+        Assert.Equal(lane, ClaudeHookMapper.Lane(command));
+    }
+
+    [Fact]
+    public void TaskStop_SendsTheJobWorkerAway()
+    {
+        using var doc = JsonDocument.Parse("""
+            { "session_id": "s1", "cwd": "/x/rovans", "hook_event_name": "PreToolUse", "tool_name": "TaskStop", "tool_input": { "task_id": "b1oyll8ht" } }
+            """);
+        using var odd = JsonDocument.Parse("""
+            { "session_id": "s1", "hook_event_name": "PreToolUse", "tool_name": "TaskStop", "tool_input": { "task_id": "not an id!" } }
+            """);
+
+        var stop = ClaudeHookMapper.JobStopped(doc.RootElement, At)!;
+
+        Assert.Equal(EventKinds.JobStop, stop.Kind);
+        Assert.Equal("job:s1:b1oyll8ht", stop.Actor.Id);
+        Assert.Null(ClaudeHookMapper.JobStopped(odd.RootElement, At));
+        Assert.Null(ClaudeHookMapper.BackgroundJob(doc.RootElement, At));
+    }
 }

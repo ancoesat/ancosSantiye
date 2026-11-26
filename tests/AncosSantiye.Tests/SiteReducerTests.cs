@@ -336,4 +336,57 @@ public class SiteReducerTests
         Assert.Equal("Ten", s.CurrentTask);
         Assert.Equal(["1", "2", "3", "4", "5", "6", "7", "8", "9", "Ten", "Eleven"], s.CurrentTasks.Select(t => t.Subject));
     }
+
+    private static SiteEvent Job(int second, string kind, string session, string id, string? lane, string say = "Run")
+    {
+        var data = new Dictionary<string, string> { ["job"] = id, ["say"] = say };
+        if (lane is not null)
+        {
+            data["lane"] = lane;
+        }
+
+        return SiteEvent.Create(Sources.ClaudeCode, "demo", new Actor($"job:{session}:{id}", Roles.Subcontractor, lane ?? "Background job"),
+            kind, session: session, data: data, ts: new DateTimeOffset(2026, 11, 26, 10, 0, second, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void Jobs_StartWork_ReplaceTheirOwnLane_AndStop()
+    {
+        var s = SiteReducer.Replay([
+            Job(0, EventKinds.JobStart, "s1", "a1", "agy", "Run rovans-010 on agy"),
+            Job(1, EventKinds.JobStart, "s1", "o1", "opencode"),
+            Job(2, EventKinds.JobStart, "s2", "a9", "agy"),
+        ]);
+
+        var agy = s.Actors["job:s1:a1"];
+        Assert.Equal((Roles.Subcontractor, Activities.Working, Doing.Build, "Run rovans-010 on agy"), (agy.Role, agy.Activity, agy.Action, agy.Say));
+
+        s = SiteReducer.Reduce(s, Job(3, EventKinds.JobStart, "s1", "a2", "agy"));
+        Assert.Equal(["job:s1:a2", "job:s1:o1", "job:s2:a9"], s.Actors.Keys);
+
+        s = SiteReducer.Reduce(s, Job(4, EventKinds.JobStop, "s1", "o1", null));
+        Assert.Equal(["job:s1:a2", "job:s2:a9"], s.Actors.Keys);
+
+        s = SiteReducer.Reduce(s, SiteEvent.Create(Sources.ClaudeCode, "demo", new Actor("chief:s1", Roles.Chief), EventKinds.SessionEnd,
+            session: "s1", ts: new DateTimeOffset(2026, 11, 26, 10, 0, 5, TimeSpan.Zero)));
+        Assert.Equal(["job:s2:a9"], s.Actors.Keys);
+    }
+
+    [Fact]
+    public void Jobs_WithoutALane_DoNotReplaceEachOther()
+    {
+        var s = SiteReducer.Replay([Job(0, EventKinds.JobStart, "s1", "d1", null), Job(1, EventKinds.JobStart, "s1", "d2", null)]);
+
+        Assert.Equal(2, s.Actors.Count);
+    }
+
+    [Fact]
+    public void Silence_GivesJobsAnHour()
+    {
+        var s = SiteReducer.Replay([Job(0, EventKinds.JobStart, "s1", "a1", "agy")]);
+        var start = s.Actors["job:s1:a1"].LastSeen;
+
+        Assert.Single(Silence.Drop(s, start.AddMinutes(59)).Actors);
+        Assert.Empty(Silence.Drop(s, start.AddMinutes(61)).Actors);
+    }
 }

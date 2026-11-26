@@ -45,10 +45,16 @@ public static class Silence
     public static readonly TimeSpan Working = TimeSpan.FromMinutes(15);
     public static readonly TimeSpan Waiting = TimeSpan.FromMinutes(60);
 
+    /// <summary>A background job sends nothing while it runs and no hook says when it is done.</summary>
+    public static readonly TimeSpan Job = TimeSpan.FromMinutes(60);
+
+    private static TimeSpan LimitFor(ActorState a) =>
+        a.Id.StartsWith("job:", StringComparison.Ordinal) ? Job : a.Action == Doing.Wait ? Waiting : Working;
+
     public static SiteState Drop(SiteState state, DateTimeOffset now)
     {
         var gone = state.Actors
-            .Where(a => now - a.Value.LastSeen > (a.Value.Action == Doing.Wait ? Waiting : Working))
+            .Where(a => now - a.Value.LastSeen > LimitFor(a.Value))
             .Select(a => a.Key)
             .ToArray();
         return gone.Length == 0 ? state : state with { Actors = state.Actors.RemoveRange(gone) };
