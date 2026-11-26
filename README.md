@@ -88,7 +88,7 @@ A missing or broken profile stops the server with one clear line. It never falls
 
 ### Projects
 
-The site shows one project at a time. A project is the folder a Claude Code session runs in (its last folder name, case does not matter). By default the page follows the project that was active last; pick one in the header to pin it (`?project=name` in the address). Alerts still come from every project, and the picker shows how many gates wait in each. Every Claude Code window is its own worker, so two sessions on one project are two workers.
+The site shows one project at a time. A project is the folder a Claude Code session starts in (its last folder name, case does not matter). A session stays in that project even when Claude works in other folders. By default the page follows the project that was active last; pick one in the header to pin it (`?project=name` in the address). Alerts still come from every project, and the picker shows how many gates wait in each. Every Claude Code window is its own worker, so two sessions on one project are two workers.
 
 ### Folder lane
 

@@ -154,6 +154,12 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Version 0.2.1.
 - Claude checked: `check.sh` green (268 tests). 12 mutations caught; one (replay clears the recent list) survived first, because the 20 event cap hid it, and got a test with a small project. End to end: SessionStart through the real `hook` command, a 4 step plan, the browser and an edit: header "1 of 4 tasks done / now: Add the match collection", the Tasks panel, the worker on the building, Activity filled on page load.
 
+## 2026-11-26 v0.2.2: a session stays in its project
+
+- A session stays in the project it first showed up in (`SiteHub` pins session to project, on publish and on replay; replay forgets earlier pins). Reading Esat's own log found it: the rovans session put 398 events in rovans, 77 in `_phase-logs` (it writes briefs there) and 5 in xgame, because the hook's `cwd` follows Claude into other folders. Its plan landed in `_phase-logs`, so the page showed no tasks for rovans and follow mode kept jumping. Replaying that real log after the fix: one rovans project with its 6 step plan and the current step.
+- Version 0.2.2.
+- Claude checked: `check.sh` green (271 tests). 3 mutations caught (pin on publish, pin on replay, replay forgets old pins; the last survived first and got a test across two days).
+
 ## Problems
 
 | Problem | Cause | Fix |

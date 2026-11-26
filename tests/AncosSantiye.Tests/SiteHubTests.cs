@@ -154,6 +154,53 @@ public sealed class SiteHubTests : IDisposable
         Assert.Single(_hub.RecentOf("rovans"));
     }
 
+    private static SiteEvent InSession(string project, string session, int second, string tool) =>
+        SiteEvent.Create(Sources.ClaudeCode, project, new Actor($"chief:{session}", Roles.Chief, "Claude Code"), EventKinds.ToolStart,
+            session: session, data: new Dictionary<string, string> { ["tool"] = tool }, ts: Start.AddSeconds(second));
+
+    [Fact]
+    public void ASession_StaysInTheProjectItStartedIn()
+    {
+        _hub.Publish(InSession("rovans", "s1", 0, "Read"));
+        _hub.Publish(InSession("_phase-logs", "s1", 1, "Write"));
+        _hub.Publish(InSession("xgame", "s2", 2, "Bash"));
+        _hub.Publish(SiteEvent.Create(Sources.Folder, "_phase-logs", new Actor("folder", Roles.Chief), EventKinds.StageChanged,
+            data: new Dictionary<string, string> { ["stage"] = "T1" }, ts: Start.AddSeconds(3)));
+
+        Assert.Equal("Write", _hub.StateOf("rovans").Actors["chief:s1"].Tool);
+        Assert.Empty(_hub.StateOf("_phase-logs").Actors);
+        Assert.Equal("T1", _hub.StateOf("_phase-logs").Stage);
+        Assert.Single(_hub.StateOf("xgame").Actors);
+        Assert.Equal("rovans", _hub.RecentOf("rovans")[^1].Project);
+    }
+
+    [Fact]
+    public void ASplitLog_IsMendedOnReplay()
+    {
+        var log = new EventLog(_dir);
+        log.Append(InSession("rovans", "s1", 0, "Read"));
+        log.Append(InSession("_phase-logs", "s1", 1, "Write"));
+
+        _hub.Load(DateOnly.FromDateTime(Start.UtcDateTime));
+
+        Assert.Equal(["rovans"], _hub.Projects.Select(p => p.Name));
+        Assert.Equal("Write", _hub.StateOf("rovans").Actors["chief:s1"].Tool);
+    }
+
+    [Fact]
+    public void Replay_ForgetsPinsFromBefore()
+    {
+        _hub.Publish(InSession("xgame", "s1", 0, "Read"));
+        var nextDay = Start.AddDays(1);
+        new EventLog(_dir).Append(SiteEvent.Create(Sources.ClaudeCode, "rovans", new Actor("chief:s1", Roles.Chief, "Claude Code"),
+            EventKinds.ToolStart, session: "s1", data: new Dictionary<string, string> { ["tool"] = "Edit" }, ts: nextDay));
+        _clock.Now = nextDay.AddMinutes(1);
+
+        _hub.Load(DateOnly.FromDateTime(nextDay.UtcDateTime));
+
+        Assert.Equal(["rovans"], _hub.Projects.Select(p => p.Name));
+    }
+
     [Fact]
     public void NothingYet_IsEmpty()
     {

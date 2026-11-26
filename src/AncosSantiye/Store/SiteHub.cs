@@ -27,6 +27,10 @@ public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
     private ImmutableDictionary<string, (SiteState State, DateTimeOffset LastSeen)> _projects =
         ImmutableDictionary.Create<string, (SiteState, DateTimeOffset)>(StringComparer.OrdinalIgnoreCase);
 
+    // The project a session first showed up in. Claude moves between folders (writing a brief elsewhere,
+    // a cd in a command) and the hook's cwd moves with it; the session's work still belongs here.
+    private ImmutableDictionary<string, string> _sessionProject = ImmutableDictionary<string, string>.Empty;
+
     private ImmutableDictionary<string, ImmutableQueue<SiteEvent>> _recent =
         ImmutableDictionary.Create<string, ImmutableQueue<SiteEvent>>(StringComparer.OrdinalIgnoreCase);
 
@@ -82,11 +86,12 @@ public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
         {
             _projects = _projects.Clear();
             _recent = _recent.Clear();
+            _sessionProject = _sessionProject.Clear();
             foreach (var e in result.Events)
             {
                 if (keep is null || keep(e))
                 {
-                    ApplyLocked(e);
+                    ApplyLocked(PinLocked(e));
                 }
             }
         }
@@ -99,6 +104,7 @@ public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
         Channel<SiteEvent>[] subscribers;
         lock (_gate)
         {
+            e = PinLocked(e);
             log.Append(e);
             ApplyLocked(e);
             subscribers = [.. _subscribers];
@@ -139,6 +145,22 @@ public sealed class SiteHub(EventLog log, TimeProvider? clock = null)
 
             channel.Writer.TryComplete();
         });
+    }
+
+    private SiteEvent PinLocked(SiteEvent e)
+    {
+        if (e.Session is not { Length: > 0 } session)
+        {
+            return e;
+        }
+
+        if (_sessionProject.TryGetValue(session, out var project))
+        {
+            return string.Equals(project, e.Project, StringComparison.OrdinalIgnoreCase) ? e : e with { Project = project };
+        }
+
+        _sessionProject = _sessionProject.SetItem(session, e.Project);
+        return e;
     }
 
     private void ApplyLocked(SiteEvent e)

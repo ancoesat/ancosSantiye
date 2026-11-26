@@ -69,6 +69,7 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 - A test with fixed event times must use a fixed clock (`FixedClock`) for anything served through `SiteHub`. With the real clock it passes today and fails after 15 minutes of event time. (v0.2 #6.)
 - Before packing, delete `src/AncosSantiye/obj/Release`: a stale obj kept precompressed `.br`/`.gz` files in the package after compression was turned off. (F8.)
 - An Origin check against `request.Host` is only as good as the host filter in front of it. Test the filter with a foreign Host and a matching Origin. (F7 review.)
+- A session's project is where it started; `cwd` in later hooks follows Claude into other folders (briefs, cd). `SiteHub` pins it. (v0.2.2, found in Esat's real log.)
 - SessionStart runs only `command` (and `mcp_tool`) hooks; an `http` entry there never fires. Check each hook event's allowed types in the Claude Code docs before installing it. (v0.2.1, found by a read-only diagnosis run in Claude Code.)
 - `@{u}` is not always where `git push` goes; `@{push}` is. If git cannot name it, do not push. (F7 review.)
 - A time limit on a child process must cover reading its pipes too, not only waiting for exit. (F7 review.)
