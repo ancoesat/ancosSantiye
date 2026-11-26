@@ -21,9 +21,10 @@ const IDLE_POOL = [238, 300, 86, 52, 226];
 // Where each kind of action happens (see Doing in SiteState.cs). x is the first place, step the next
 // one for a second person there, faceLeft where they look. Building has its own rule below.
 const STATIONS = {
-  read: { x: 288, step: -10, faceLeft: false }, // at the board by the gate
-  run: { x: 60, step: -12, faceLeft: false }, // at the crane controls
-  plan: { x: 262, step: -10, faceLeft: true }, // at the site office
+  // Steps are wider than the widest character and its name tag, so two people at one station never overlap.
+  read: { x: 288, step: -30, faceLeft: false }, // at the board by the gate
+  run: { x: 52, step: 30, faceLeft: false }, // at the crane controls
+  plan: { x: 262, step: -30, faceLeft: true }, // at the site office
 };
 
 // The people on screen. Follows SiteState.actors: newcomers walk in from the left, leavers walk out.
@@ -159,9 +160,22 @@ export class Cast {
 
   // Positions for the name tags and speech bubbles, in scene pixels (feet position).
   tags() {
-    return [...this.members.values()].map((m) => ({
+    // Two sessions of one project are both "Claude Code": number them so they can be told apart.
+    const members = [...this.members.values()].sort((a, b) => a.actor.id.localeCompare(b.actor.id));
+    const count = {};
+    for (const m of members) {
+      const name = m.actor.name ?? m.actor.role;
+      count[name] = (count[name] ?? 0) + 1;
+    }
+    const seen = {};
+    return members.map((m) => ({
       id: m.actor.id,
-      label: m.actor.name ?? m.actor.role,
+      label: (() => {
+        const name = m.actor.name ?? m.actor.role;
+        if (count[name] < 2) return name;
+        seen[name] = (seen[name] ?? 0) + 1;
+        return `${name} ${seen[name]}`;
+      })(),
       say: m.actor.say ?? null,
       activity: m.actor.activity,
       x: m.x,
