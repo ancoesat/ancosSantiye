@@ -128,7 +128,7 @@ export function demoState(name) {
   };
 
   const key = String(name ?? "").trim().toLowerCase();
-  return states[key] ?? states.build;
+  return { ...(states[key] ?? states.build), usageUpdated: minutesAgo(1) };
 }
 
 export function demoEvents() {

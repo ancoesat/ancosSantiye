@@ -99,6 +99,9 @@ public sealed record SiteState(
     /// <summary>The first open task of the current list: what the work is about right now.</summary>
     public string? CurrentTask => CurrentList.FirstOrDefault(t => !t.Done)?.Subject;
 
+    /// <summary>When the status line last sent new values. The page uses it to say how old Budget is.</summary>
+    public DateTimeOffset? UsageUpdated { get; init; }
+
     public static SiteState Empty { get; } = new(
         null,
         ImmutableSortedDictionary<string, ActorState>.Empty,

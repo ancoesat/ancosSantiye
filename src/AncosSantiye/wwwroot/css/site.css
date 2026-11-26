@@ -294,3 +294,7 @@ main {
 .action-result { margin: 4px 0 0; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .action-result.ok { color: var(--ok); }
 .action-result.off { color: var(--off); }
+
+/* Budget older than 15 minutes: still shown, clearly not current. */
+.panel.stale .bar,
+.panel.stale .stat { opacity: 0.45; }

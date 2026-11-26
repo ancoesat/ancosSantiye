@@ -222,23 +222,45 @@ function thousands(value) {
   return number === null ? "no data" : number.toLocaleString("en-US");
 }
 
-function budgetSection(usage) {
+// Budget only comes from the Claude Code status line, which only runs in a terminal session.
+// It says where its numbers come from and how old they are, shows only what it has, and grays out when old.
+const BUDGET_STALE_MS = 15 * 60000;
+
+function budgetSection(usage, updated, now) {
   const node = section("Budget");
   if (Object.keys(usage).length === 0) {
-    node.append(emptyLine("No data yet. Set up the status line: ancos-santiye hooks install"));
+    node.append(emptyLine("No budget data. It comes from the Claude Code status line, which only runs in a terminal session (claude). Sessions in the desktop app do not send it."));
     return node;
   }
 
+  const at = timeOf(updated);
+  const stale = at > 0 && now - at > BUDGET_STALE_MS;
+  const age = at > 0 ? waitedText(now, updated) : null;
+  const when = age === null ? "" : age === "just now" ? ", just now" : `, ${age} ago`;
+  node.append(make("p", "meta", `terminal status line${when}${stale ? " (old)" : ""}`));
+  if (stale) node.classList.add("stale");
+
+  // A limit window whose reset time has passed is over: its old percentage would mislead.
+  const open = (resetsAt) => {
+    const seconds = numeric(resetsAt);
+    return seconds === null || seconds * 1000 > now;
+  };
+
+  const rows = [];
+  if (numeric(usage.contextUsedPercentage) !== null) rows.push(bar("Context", usage.contextUsedPercentage, null));
+  if (numeric(usage.fiveHourUsedPercentage) !== null && open(usage.fiveHourResetsAt)) {
+    rows.push(bar("5 hour limit", usage.fiveHourUsedPercentage, resetText(usage.fiveHourResetsAt, false)));
+  }
+  if (numeric(usage.sevenDayUsedPercentage) !== null && open(usage.sevenDayResetsAt)) {
+    rows.push(bar("7 day limit", usage.sevenDayUsedPercentage, resetText(usage.sevenDayResetsAt, true)));
+  }
   const cost = numeric(usage.costUsd);
-  node.append(
-    bar("Context", usage.contextUsedPercentage, null),
-    bar("5 hour limit", usage.fiveHourUsedPercentage, resetText(usage.fiveHourResetsAt, false)),
-    bar("7 day limit", usage.sevenDayUsedPercentage, resetText(usage.sevenDayResetsAt, true)),
-    line("Cost", cost === null ? "no data" : `$${cost.toFixed(2)}`),
-    line("Input tokens", thousands(usage.totalInputTokens)),
-    line("Output tokens", thousands(usage.totalOutputTokens)),
-    line("Model", isMissing(usage.model) ? "no data" : String(usage.model)),
-  );
+  if (cost !== null) rows.push(line("Cost", `$${cost.toFixed(2)}`));
+  if (numeric(usage.totalInputTokens) !== null) rows.push(line("Input tokens", thousands(usage.totalInputTokens)));
+  if (numeric(usage.totalOutputTokens) !== null) rows.push(line("Output tokens", thousands(usage.totalOutputTokens)));
+  if (!isMissing(usage.model)) rows.push(line("Model", String(usage.model)));
+
+  node.append(...rows);
   return node;
 }
 
@@ -297,7 +319,7 @@ export function renderPanels(root, state, events, now) {
   root.append(
     waitingSection(gates, at),
     piecesSection(site, pieces),
-    budgetSection(usage),
+    budgetSection(usage, site.usageUpdated, at),
     activitySection(feed),
   );
 }

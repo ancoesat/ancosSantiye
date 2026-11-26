@@ -249,4 +249,18 @@ public class SiteReducerTests
         Assert.Equal(Doing.Wait, s.Actors["chief"].Action);
         Assert.Equal(Doing.Start, SiteReducer.Replay([Ev.At(0, EventKinds.SessionStart)]).Actors["chief"].Action);
     }
+
+    [Fact]
+    public void Usage_IsReplaced_AndKnowsItsTime()
+    {
+        var s = SiteReducer.Replay([
+            Ev.At(0, EventKinds.Usage, null, null, ("contextUsedPercentage", "8"), ("fiveHourUsedPercentage", "23.5")),
+            Ev.At(9, EventKinds.Usage, null, null, ("contextUsedPercentage", "12")),
+        ]);
+
+        Assert.Equal("12", s.Usage["contextUsedPercentage"]);
+        Assert.False(s.Usage.ContainsKey("fiveHourUsedPercentage"));
+        Assert.Equal(new DateTimeOffset(2026, 11, 24, 20, 0, 9, TimeSpan.Zero), s.UsageUpdated);
+        Assert.Contains("\"usageUpdated\"", Json(s));
+    }
 }

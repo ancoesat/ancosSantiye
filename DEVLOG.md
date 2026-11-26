@@ -129,6 +129,13 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Page (`cast.js`): one station per action. Read at the board by the gate, build on the roof (at the walls before there are floors), run at the crane controls, plan at the site office; wait, start and fail at the worker's own spot. A second person at a station stands next to the first. On arrival a worker faces its work. Only a builder at the building plays "work"; everyone else stands still, so a walk always means the agent changed what it does. The supplier stays by its truck.
 - Claude checked: `check.sh` green (250 tests). 6 mutations caught (read, build and run tools, place kept between tools, wait after the turn, fail is its own place). Headless Chrome, one session through Read, Edit, Bash and Stop: the worker went to the board, the roof, the crane and its own spot. No console errors.
 
+## 2026-11-26 v0.2 #5: honest Budget
+
+- Why: Budget showed "no data" rows for a desktop app session (which never runs the status line) and kept a test value as if it were current.
+- Reducer: a usage event replaces the values instead of merging them, so a limit window the status line stopped sending disappears; `UsageUpdated` keeps when it last changed.
+- Panel: says where the numbers come from and how old they are ("terminal status line, 3 min ago"), shows only the values it has, hides a 5 hour or 7 day window whose reset time has passed, and grays everything out with "(old)" after 15 minutes. With no data at all it says why: Budget comes from the status line, which only runs in a terminal session.
+- Claude checked: `check.sh` green (251 tests). 2 mutations caught (replaced not merged, usage time). Headless Chrome: a desktop-only project showed the explanation; a terminal status line post showed context, the 5 hour bar, cost, tokens and model, with the past 7 day window hidden; data 20 minutes old rendered as "(old)" at 0.45 opacity. No console errors.
+
 ## Problems
 
 | Problem | Cause | Fix |

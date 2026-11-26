@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AncosSantiye.Events;
 
 namespace AncosSantiye.Scene;
@@ -33,7 +34,9 @@ public static class SiteReducer
             EventKinds.GatePending when GateId(e) is { } id
                 => state with { Gates = state.Gates.SetItem(id, new GateState(id, e.Piece, Value(e, "label"), e.Ts)) },
             EventKinds.GateCleared when GateId(e) is { } id => state with { Gates = state.Gates.Remove(id) },
-            EventKinds.Usage when e.Data is { Count: > 0 } data => state with { Usage = state.Usage.SetItems(data) },
+            // Replaced, not merged: a value the status line stopped sending (a limit window that reset) must go.
+            EventKinds.Usage when e.Data is { Count: > 0 } data
+                => state with { Usage = ImmutableSortedDictionary.CreateRange(data), UsageUpdated = e.Ts },
             _ => null,
         };
 

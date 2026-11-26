@@ -74,7 +74,7 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 ## Open items
 
 - Found in the first real use (2026-11-26):
-  - Budget only fills from an interactive terminal `claude` session. The desktop app's Code tab and `claude -p` never run the status line, and hooks carry no usage data.
+  - Budget only fills from an interactive terminal `claude` session. The desktop app's Code tab and `claude -p` never run the status line, and hooks carry no usage data. Since v0.2 #5 the panel says so instead of showing empty rows.
   - Workers from sessions that ended without `session.end` (app closed, login expired) stay idle on the site forever. Needs a timeout.
   - The day's log replay brings back folder lane gates from a project the current profile no longer watches (santiye-f8 stayed "waiting" under the kbyte profile). Since v0.2 #4 they stay inside their own project and no longer mix in, but they still alert and count as waiting until the next day.
 
