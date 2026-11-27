@@ -40,10 +40,10 @@ public sealed class OpenCodeMapperTests
     [Fact]
     public void ExtraFields_AreNeverKept()
     {
-        var e = Map("""{"kind":"tool.start","session":"s","tool":"bash","command":"rm -rf / --token Zq9Leak","args":{"x":"secret"}}""")!;
+        var e = Map("""{"kind":"tool.start","session":"s","tool":"bash","command":"rm -rf / --token FAKE_SECRET_MARKER","args":{"x":"secret"}}""")!;
 
         var all = JsonSerializer.Serialize(e, EventJson.Options);
-        Assert.DoesNotContain("Zq9Leak", all);
+        Assert.DoesNotContain("FAKE_SECRET_MARKER", all);
         Assert.DoesNotContain("secret", all);
         Assert.Equal("Running a command", e.Data!["say"]);
     }

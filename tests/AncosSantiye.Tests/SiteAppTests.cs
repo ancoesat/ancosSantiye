@@ -39,6 +39,7 @@ public sealed class SiteAppTests : IAsyncLifetime
     [InlineData("/", "text/html", "<canvas id=\"site\"")]
     [InlineData("/js/main.js", "text/javascript", "loadSkin")]
     [InlineData("/skin/skin.json", "application/json", "\"characters\"")]
+    [InlineData("/css/site.css", "text/css", "Anco Heist")]
     public async Task ServesThePageAndTheSkin(string path, string mediaType, string contains)
     {
         using var response = await _http.GetAsync(path);
@@ -46,6 +47,8 @@ public sealed class SiteAppTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(mediaType, response.Content.Headers.ContentType?.MediaType);
         Assert.Contains(contains, await response.Content.ReadAsStringAsync());
+        // After an update the browser must ask again, or it mixes new HTML with an old stylesheet.
+        Assert.True(response.Headers.CacheControl?.NoCache, $"{path} has no Cache-Control: no-cache");
     }
 
     [Fact]

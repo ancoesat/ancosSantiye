@@ -102,9 +102,17 @@ public static class SiteApp
         }
 
         // The page lives next to the app. The active skin (built in or the profile's own folder) is always at /skin.
+        // no-cache: the browser may keep a file but must ask first (a cheap 304). Without it, a browser
+        // guesses a cache time and, after an update, mixes new HTML with an old stylesheet or script.
+        static void Revalidate(Microsoft.AspNetCore.StaticFiles.StaticFileResponseContext c) => c.Context.Response.Headers.CacheControl = "no-cache";
         app.UseDefaultFiles();
-        app.UseStaticFiles();
-        app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(Path.GetFullPath(skinRoot)), RequestPath = "/skin" });
+        app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = Revalidate });
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(Path.GetFullPath(skinRoot)),
+            RequestPath = "/skin",
+            OnPrepareResponse = Revalidate,
+        });
 
         // What the page may show. The token is only here when actions are on, and only this page can read it:
         // another site gets no CORS header, and the host filter stops DNS rebinding.

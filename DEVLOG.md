@@ -202,6 +202,12 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 - Version 0.3.0. Claude checked: `check.sh` green (396 tests). 25 mutations, all caught (two first runs were compile errors, redone as real mutations; one survivor, the diagnose catch, showed it could not be reached on Linux, so the wrapper is now tested directly). The plugin source ran under node and bun with a fake `fetch`: both loader styles, no command, prompt or other tool's description leaves it. Headless: the setup page connects agy (backup made, the user's own hooks kept) and OpenCode with a fake home.
 - Not seen live yet: agy's hooks file format and OpenCode's plugin loader are young. CLAUDE.md open items says how to check.
 
+## 2026-11-27 v0.3.1: no stale files after an update
+
+- Esat's browser showed the new `index.html` with a much older `site.css` after updating: unstyled header, old panel titles. The server sent static files without `Cache-Control`, so the browser picked its own cache time and kept the old stylesheet. Now every static file (page, scripts, styles, skin) is sent with `Cache-Control: no-cache`: the browser keeps it but asks first, and gets a cheap 304 when nothing changed. Test: every served file carries the header (mutation caught).
+- The fake token in the leak tests is now `FAKE_SECRET_MARKER`, so a reader does not take it for a real one.
+- Version 0.3.1, so `dotnet tool update` picks it up without an uninstall. `check.sh` green (397 tests).
+
 ## Problems
 
 | Problem | Cause | Fix |
@@ -220,7 +226,8 @@ Decision: hook entries set `"timeout": 2`. The endpoint only enqueues and return
 | A mutation of the first-tick skip passed | The test read the state version after the first tick, so it could not see events published during that tick | The test asserts version 0 after the first tick |
 | Two Opus findings in v0.3 P4: the setup token opened commit and push, and the written hook URL came from the request's Host | One `ActionGuard` reused for a second door, and `request.Host` trusted for the address to write (the host filter only checks the name, not the port) | A token per door, served from `/config`; the written URL is always `ServerOptions.DefaultUrl`. Tests for both |
 | `connect` wrote `.config/opencode/...` into the current folder when HOME did not exist | `Environment.SpecialFolder.UserProfile` is `""` then, and `Path.Combine("", ".config")` is relative | Connect refuses a home that is not an existing absolute folder |
-| A leak test failed once in `check.sh` and passed on the next run | It asserted that the event JSON does not contain `"abc"`, and the event's random Guid sometimes does | Sentinels are words a Guid cannot hold (`Zq9Leak`) |
+| After `dotnet tool update` the browser showed the new page with an old stylesheet | Static files had no `Cache-Control`, so the browser kept them for a time of its own choosing | `Cache-Control: no-cache` on every static file |
+| A leak test failed once in `check.sh` and passed on the next run | It asserted that the event JSON does not contain `"abc"`, and the event's random Guid sometimes does | Sentinels are words a Guid cannot hold (`FAKE_SECRET_MARKER`, renamed from `Zq9Leak` so nobody mistakes it for a real token) |
 | `dotnet run` listened on `localhost:5087`, not `127.0.0.1:5170` | The template's `launchSettings.json` sets the URL, so the code default was skipped | Deleted `launchSettings.json` |
 
 ## Lessons
