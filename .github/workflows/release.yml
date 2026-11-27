@@ -1,0 +1,41 @@
+# A pushed tag v1.2.3 becomes a GitHub release with the tool package attached.
+# `ancos-santiye update` and the page's Update link install from these releases, and check the
+# package against the SHA-256 GitHub shows for it.
+name: release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Tag and project version must match
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/AncosSantiye/AncosSantiye.csproj)"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match <Version>$version</Version> in AncosSantiye.csproj"
+            exit 1
+          fi
+
+      - name: Gate
+        run: bash scripts/check.sh
+
+      - name: Pack
+        run: dotnet pack src/AncosSantiye -c Release -o artifacts --nologo
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" artifacts/AncosSantiye.*.nupkg --title "$GITHUB_REF_NAME" --generate-notes

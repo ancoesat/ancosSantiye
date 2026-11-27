@@ -19,14 +19,15 @@ function emptyModel() {
   };
 }
 
+// A stage line is free text ("F4", "P6 part 1 approved, waiting for Esat to push"). Only its first word counts.
 function phaseOf(stage) {
-  const value = String(stage ?? "").trim().toLowerCase();
+  const value = String(stage ?? "").trim().toLowerCase().split(/[\s:,.(]/)[0];
   if (!value) return "empty";
   if (value === "r1") return "foundation";
   if (value === "r2") return "frame";
   if (value === "r3") return "ready";
   if (value === "done" || value === "bitti") return "done";
-  if (value.startsWith("f")) return "building";
+  if (/^[fp]\d/.test(value)) return "building";
   return "empty";
 }
 
@@ -42,13 +43,22 @@ export function lookOf(status, verdict) {
   return "planned";
 }
 
+// Finished work at the bottom, open work on top, like a real building. With more pieces than slots, the
+// open ones always get a place and the finished ones fill what is left: the Pieces panel lists them all.
+const ORDER = { solid: 0, torn: 1, pending: 2, half: 3, planned: 4 };
+
 function slotsFromPieces(pieces) {
-  return Object.entries(pieces)
+  const slots = Object.entries(pieces)
     .map(([key, piece]) => ({
       id: String(piece?.id ?? key),
       look: lookOf(piece?.status, piece?.verdict),
     }))
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    .sort((a, b) => ORDER[a.look] - ORDER[b.look] || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const room = SLOTS_PER_FLOOR * MAX_FLOORS;
+  if (slots.length <= room) return slots;
+  const open = slots.filter((slot) => slot.look !== "solid").slice(-room);
+  const solid = slots.filter((slot) => slot.look === "solid").slice(0, room - open.length);
+  return [...solid, ...open];
 }
 
 function slotsFromTasks(tasksDone, tasksPlanned) {
@@ -65,6 +75,12 @@ export function buildingFrom(state) {
   if (!state || typeof state !== "object") return model;
 
   model.phase = phaseOf(state.stage);
+
+  // A status table is the progress whatever its stage line says: every piece done means a finished building.
+  const pieceList = state.pieces && typeof state.pieces === "object" ? Object.values(state.pieces) : [];
+  if (pieceList.length > 0 && (model.phase === "empty" || model.phase === "building")) {
+    model.phase = pieceList.every((piece) => lookOf(piece?.status, piece?.verdict) === "solid") ? "done" : "building";
+  }
 
   // No orchestra stage: the session's own task list is the progress. Open tasks mean building,
   // a fully done list means a finished building. No tasks means no building: nothing is pretended.

@@ -49,8 +49,44 @@ public sealed class ProfileTests : IDisposable
     }
 
     [Theory]
+    [InlineData("*-durum.md", "rovans-durum.md", "rovans")]
+    [InlineData("*-durum.md", "kbyte-preview-durum.md", "kbyte-preview")]
+    [InlineData("*-durum.md", "ROVANS-DURUM.MD", "ROVANS")]
+    [InlineData("*-durum.md", "-durum.md", null)]
+    [InlineData("*-durum.md", "  -durum.md", null)]
+    [InlineData("*-durum.md", "rovans-001-check.log", null)]
+    [InlineData("*-durum.md", "rovans-durum.md.bak", null)]
+    [InlineData("status-*.md", "status-kbyte.md", "kbyte")]
+    [InlineData("x-durum.md", "x-durum.md", "x")]
+    [InlineData("x-durum.md", "y-durum.md", null)]
+    public void ProjectOf_NamesTheProjectFromTheFileName(string statusFile, string fileName, string? project)
+    {
+        var lane = new FolderLaneProfile("d", statusFile, statusFile.Contains('*') ? null : "x");
+
+        Assert.Equal(project, lane.ProjectOf(fileName));
+    }
+
+    [Fact]
+    public void UpdateChecks_AreOnUnlessTurnedOff()
+    {
+        Assert.True(Profile.Load(Write("{}")).Item1!.UpdateCheck);
+        Assert.False(Profile.Load(Write("""{ "updateCheck": false }""")).Item1!.UpdateCheck);
+    }
+
+    [Fact]
+    public void APattern_NeedsNoProject()
+    {
+        var (profile, error) = Profile.Load(Write("""{ "folderLane": { "directory": "d", "statusFile": "*-durum.md" } }"""));
+
+        Assert.Null(error);
+        Assert.True(profile!.FolderLane!.IsPattern);
+    }
+
+    [Theory]
     [InlineData("""{ "folderLane": { "directory": "d", "statusFile": "s.md" } }""", "folderLane needs")]
     [InlineData("""{ "folderLane": { "directory": "d", "statusFile": "s.md", "project": "p", "intervalSeconds": 0 } }""", "intervalSeconds")]
+    [InlineData("""{ "folderLane": { "directory": "d", "statusFile": "*-*.md" } }""", "at most one *")]
+    [InlineData("""{ "folderLane": { "directory": "d", "statusFile": "../*-durum.md" } }""", "at most one *")]
     [InlineData("""{ "skin": """, "not valid JSON")]
     [InlineData("""{ "actions": { "enabled": true } }""", "actions.repos")]
     [InlineData("""{ "actions": { "enabled": true, "repos": [] } }""", "actions.repos")]

@@ -5,14 +5,16 @@ using AncosSantiye.Store;
 namespace AncosSantiye.Adapters;
 
 /// <summary>
-/// Polls one folder: the status file (changes become events) and delivery files (new ones become events).
+/// Polls one folder: the status file, or every status file that matches the profile's <c>*</c> (changes become
+/// events, each for its own project), and delivery files of those projects (new ones become events).
 /// Polling, not a file watcher: watchers miss events on network drives and WSL mounts, and one stat a second is free.
 /// </summary>
 public sealed class FolderLane(FolderLaneProfile profile, SiteHub hub, ILogger<FolderLane> logger) : BackgroundService
 {
     private readonly HashSet<string> _seen = new(StringComparer.OrdinalIgnoreCase);
-    private StatusSnapshot? _last;
-    private DateTime _lastWrite;
+
+    /// <summary>Per status file: what it said last time and when it was written.</summary>
+    private readonly Dictionary<string, (StatusSnapshot Snapshot, DateTime Write)> _status = new(StringComparer.OrdinalIgnoreCase);
     private bool _first = true;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -36,21 +38,41 @@ public sealed class FolderLane(FolderLaneProfile profile, SiteHub hub, ILogger<F
     /// <summary>One poll. Public so tests can drive it without a clock.</summary>
     public void Tick(DateTimeOffset now)
     {
-        ReadStatus(now);
+        foreach (var (path, project) in StatusFiles())
+        {
+            ReadStatus(path, project, now);
+        }
+
         ReadDeliveries(now);
         _first = false;
     }
 
-    private void ReadStatus(DateTimeOffset now)
+    private IEnumerable<(string Path, string Project)> StatusFiles()
     {
-        var path = Path.Combine(profile.Directory, profile.StatusFile);
-        if (!File.Exists(path))
+        if (!profile.IsPattern)
         {
-            return;
+            var path = Path.Combine(profile.Directory, profile.StatusFile);
+            return File.Exists(path) ? [(path, profile.Project!)] : [];
         }
 
+        if (!Directory.Exists(profile.Directory))
+        {
+            return [];
+        }
+
+        // Matched again by ProjectOf: Windows' own matching is loose (8.3 names, longer extensions).
+        return Directory.EnumerateFiles(profile.Directory, profile.StatusFile)
+            .Select(path => (path, project: profile.ProjectOf(Path.GetFileName(path))))
+            .Where(f => f.project is not null)
+            .Select(f => (f.path, f.project!))
+            .ToArray();
+    }
+
+    private void ReadStatus(string path, string project, DateTimeOffset now)
+    {
         var write = File.GetLastWriteTimeUtc(path);
-        if (write == _lastWrite)
+        _status.TryGetValue(path, out var last);
+        if (write == last.Write)
         {
             return;
         }
@@ -59,18 +81,17 @@ public sealed class FolderLane(FolderLaneProfile profile, SiteHub hub, ILogger<F
 
         // A half-written file reads as an empty table, which would clear every gate. Keep the old
         // view and leave the time alone, so the next tick reads the finished file.
-        if (snapshot.Rows.Count == 0 && _last is { Rows.Count: > 0 })
+        if (snapshot.Rows.Count == 0 && last.Snapshot is { Rows.Count: > 0 })
         {
             return;
         }
 
-        foreach (var e in StatusFile.Diff(_last, snapshot, profile.Project, now))
+        foreach (var e in StatusFile.Diff(last.Snapshot, snapshot, project, now))
         {
             hub.Publish(e);
         }
 
-        _last = snapshot;
-        _lastWrite = write;
+        _status[path] = (snapshot, write);
     }
 
     private void ReadDeliveries(DateTimeOffset now)
@@ -85,7 +106,7 @@ public sealed class FolderLane(FolderLaneProfile profile, SiteHub hub, ILogger<F
             var name = Path.GetFileName(path);
             if (!_seen.Add(name)
                 || !DeliveryFile.TryParse(name, out var info)
-                || !string.Equals(info!.Project, profile.Project, StringComparison.OrdinalIgnoreCase))
+                || !profile.Watches(info!.Project))
             {
                 continue;
             }
@@ -93,7 +114,8 @@ public sealed class FolderLane(FolderLaneProfile profile, SiteHub hub, ILogger<F
             // Files already there at start are old news; only new arrivals walk onto the site.
             if (!_first)
             {
-                hub.Publish(DeliveryFile.ToEvent(info with { Project = profile.Project }, now));
+                var project = profile.IsPattern ? info.Project : profile.Project!;
+                hub.Publish(DeliveryFile.ToEvent(info with { Project = project }, now));
             }
         }
     }

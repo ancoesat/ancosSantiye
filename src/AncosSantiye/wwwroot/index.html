@@ -11,22 +11,29 @@
 </head>
 <body>
   <header>
-    <a href="/" class="brand"><img src="/img/badger-64.png" width="34" height="34" alt=""><span>ancosSantiye</span></a>
-    <select id="picker" aria-label="Project" hidden></select>
-    <span id="project"></span>
+    <a href="/" class="brand"><img src="/img/badger-64.png" width="40" height="40" alt=""><span>ancosSantiye</span></a>
+    <span id="version" class="version"></span>
+    <div class="site-sign">
+      <select id="picker" aria-label="Project" hidden></select>
+      <span id="project"></span>
+    </div>
     <a href="/setup.html" class="nav">Setup</a>
     <span id="connection" class="off">connecting</span>
   </header>
   <main>
-    <div id="stage">
-      <canvas id="site" width="320" height="184"></canvas>
-      <div id="tags"></div>
-    </div>
+    <section class="monitor">
+      <div class="monitor-bar"><span class="rec"></span>Site view</div>
+      <div id="stage">
+        <canvas id="site" width="320" height="184"></canvas>
+        <div id="tags"></div>
+      </div>
+    </section>
     <div id="side">
       <section id="actions" class="panel" hidden></section>
       <aside id="panels"></aside>
     </div>
   </main>
   <script type="module" src="/js/main.js"></script>
+  <script type="module" src="/js/version.js"></script>
 </body>
 </html>

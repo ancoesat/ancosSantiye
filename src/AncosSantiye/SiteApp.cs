@@ -82,6 +82,15 @@ public static class SiteApp
         builder.Services.AddSingleton(log);
         builder.Services.AddSingleton(hub);
         builder.Services.AddSingleton<StatusLineFeed>();
+        // One GET to GitHub at start and every 12 hours; off with "updateCheck": false in the profile,
+        // or Santiye:UpdateCheck=false (the tests do that, so they never touch the network).
+        var checkUpdates = profile.UpdateCheck && builder.Configuration["Santiye:UpdateCheck"] != "false";
+        builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromMinutes(2) });
+        builder.Services.AddSingleton<Updates.UpdateCheck>();
+        if (checkUpdates)
+        {
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<Updates.UpdateCheck>());
+        }
         if (profile.FolderLane is { } lane)
         {
             builder.Services.AddSingleton(lane);
@@ -92,10 +101,10 @@ public static class SiteApp
 
         // A status file the profile no longer watches can never clear its gates, so its old folder
         // events stay out of the replay. They are still in the log.
-        var watched = profile.FolderLane?.Project;
+        var folder = profile.FolderLane;
         var skipped = hub.Load(
             DateOnly.FromDateTime(DateTime.UtcNow),
-            e => e.Source != Sources.Folder || string.Equals(e.Project, watched, StringComparison.OrdinalIgnoreCase));
+            e => e.Source != Sources.Folder || folder?.Watches(e.Project) == true);
         if (skipped > 0)
         {
             app.Logger.LogWarning("Skipped {Count} unreadable lines in today's event log", skipped);
@@ -149,6 +158,7 @@ public static class SiteApp
                 })));
 
         MapSetup(app, setupGuard, home);
+        MapUpdates(app, setupGuard, checkUpdates, args);
         app.MapGet("/events", (SiteHub h, string? project, CancellationToken ct) => TypedResults.ServerSentEvents(Stream(h, project, ct)));
 
         // Claude Code hooks. Answer at once: an HTTP hook blocks Claude Code until it returns.
@@ -307,6 +317,55 @@ public static class SiteApp
                     });
             });
         }
+    }
+
+    /// <summary>
+    /// The version on the page and the page's Update link. The update itself sits behind the setup door:
+    /// it downloads only this repo's release package, checks GitHub's SHA-256, then the server hands over
+    /// to the update script and stops. The script installs and starts the server again with the same arguments.
+    /// </summary>
+    private static void MapUpdates(WebApplication app, ActionGuard guard, bool checkUpdates, string[] args)
+    {
+        app.MapGet("/version", (Updates.UpdateCheck check) => TypedResults.Ok(new
+        {
+            current = Updates.Releases.Display(Updates.Releases.Current),
+            checks = checkUpdates,
+            checkedAt = check.CheckedAt,
+            latest = check.Newer is { } newer ? Updates.Releases.Display(newer.Version) : null,
+            notes = check.Newer?.PageUrl,
+        }));
+
+        var busy = 0;
+        app.MapPost("/setup/update", async (HttpRequest request, Updates.UpdateCheck check, HttpClient http, IHostApplicationLifetime life, CancellationToken ct) =>
+        {
+            if (guard.Reject(request) is { } rejected)
+            {
+                return rejected;
+            }
+
+            if (check.Newer is not { } release)
+            {
+                return TypedResults.BadRequest(new { ok = false, message = "There is no newer version to install." });
+            }
+
+            if (Interlocked.Exchange(ref busy, 1) == 1)
+            {
+                return TypedResults.Conflict(new { ok = false, message = "An update is already running." });
+            }
+
+            var (dir, error) = await Updates.Updater.Download(http, release, ct);
+            if (dir is null)
+            {
+                Interlocked.Exchange(ref busy, 0);
+                return TypedResults.BadRequest(new { ok = false, message = error });
+            }
+
+            Updates.Updater.Launch(new Updates.UpdatePlan(dir, release.Version, Environment.ProcessId, Environment.CurrentDirectory, args));
+
+            // Answer first, then stop, so the page hears that the update started.
+            _ = Task.Delay(TimeSpan.FromSeconds(1)).ContinueWith(_ => life.StopApplication(), TaskScheduler.Default);
+            return TypedResults.Ok(new { ok = true, message = $"Installing {Updates.Releases.Display(release.Version)}. The site is back in a minute." });
+        });
     }
 
     private sealed record RepoRequest(int Repo);

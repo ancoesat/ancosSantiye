@@ -152,6 +152,30 @@ public sealed class SetupEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Version_IsShown_AndTestsNeverCheckGitHub()
+    {
+        using var doc = JsonDocument.Parse(await _http.GetStringAsync("/version"));
+
+        Assert.Equal(AncosSantiye.Updates.Releases.Display(AncosSantiye.Updates.Releases.Current), doc.RootElement.GetProperty("current").GetString());
+        Assert.False(doc.RootElement.GetProperty("checks").GetBoolean());
+        Assert.False(doc.RootElement.TryGetProperty("latest", out var latest) && latest.ValueKind != JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Update_NeedsTheSetupDoor_AndANewerVersion()
+    {
+        using var noToken = await Post("/setup/update", "{}", _origin, null);
+        Assert.Equal(HttpStatusCode.Unauthorized, noToken.StatusCode);
+
+        using var foreign = await Post("/setup/update", "{}", "http://evil.example", await Token());
+        Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode);
+
+        using var nothing = await Post("/setup/update", "{}", _origin, await Token());
+        Assert.Equal(HttpStatusCode.BadRequest, nothing.StatusCode);
+        Assert.Contains("no newer version", await nothing.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Connect_AForeignOrigin_IsRefused()
     {
         using var response = await Post("/setup/connect", """{"tool":"agy"}""", "http://evil.example", await Token());

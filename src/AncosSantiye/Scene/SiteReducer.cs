@@ -35,8 +35,9 @@ public static class SiteReducer
             EventKinds.TaskCreated => AddTask(state, e),
             EventKinds.TaskCompleted => CompleteTask(state, e),
             EventKinds.StageChanged when Value(e, "stage") is { } stage => state with { Stage = stage },
-            EventKinds.PieceStatus when e.Piece is not null && Value(e, "status") is { } status
-                => SetPiece(state, e.Piece, e.Ts, status, verdict: null),
+            // An empty status cell is a piece nobody started yet ("brif"), not a row to ignore.
+            EventKinds.PieceStatus when e.Piece is not null && e.Data?.ContainsKey("status") == true
+                => SetPiece(state, e.Piece, e.Ts, Value(e, "status") ?? "brif", verdict: null),
             EventKinds.DeliveryArrived when e.Piece is not null => SetPiece(state, e.Piece, e.Ts, "teslim", verdict: null),
             EventKinds.ReviewVerdict when e.Piece is not null && Value(e, "verdict") is { } verdict
                 => SetPiece(state, e.Piece, e.Ts, status: null, verdict),

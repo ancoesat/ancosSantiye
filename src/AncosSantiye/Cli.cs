@@ -37,6 +37,13 @@ public static class Cli
             case ["doctor"]:
                 return await Doctor(stdout, url);
 
+            case ["version"] or ["--version"]:
+                stdout.WriteLine(Updates.Releases.Display(Updates.Releases.Current));
+                return 0;
+
+            case ["update"]:
+                return await Update(stdout, stderr);
+
             case ["hooks", "print"]:
                 stdout.WriteLine(HookInstaller.Print(HookInstaller.Snippet(url)));
                 return 0;
@@ -65,14 +72,49 @@ public static class Cli
     }
 
     public const string Usage =
-        "Usage: ancos-santiye [--urls <url>] [--profile <file>] | doctor | connect <tool> | disconnect <tool> | statusline | hook | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]\n" +
+        "Usage: ancos-santiye [--urls <url>] [--profile <file>] | doctor | update | version | connect <tool> | disconnect <tool> | statusline | hook | hooks print | hooks install [--settings <path>] | hooks uninstall [--settings <path>]\n" +
         "Tools: claude-code, agy, opencode";
 
     private static string Home => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
     /// <summary>No arguments, or only server options like --urls. Help flags are not a server start.</summary>
     public static bool IsServerStart(string[] args) =>
-        args.Length == 0 || (args[0].StartsWith('-') && args[0] is not ("--help" or "-h"));
+        args.Length == 0 || (args[0].StartsWith('-') && args[0] is not ("--help" or "-h" or "--version"));
+
+    /// <summary>
+    /// Checks GitHub, downloads and checks the newer package, then hands over to the update script and exits.
+    /// The script stops a running server too; started from here it does not restart one (the page's Update does).
+    /// </summary>
+    private static async Task<int> Update(TextWriter stdout, TextWriter stderr)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+        var current = Updates.Releases.Current;
+        stdout.WriteLine($"This is ancosSantiye {Updates.Releases.Display(current)}. Asking GitHub for the latest release...");
+        if (await Updates.Releases.Latest(http, CancellationToken.None) is not { } latest)
+        {
+            stderr.WriteLine($"No release found (GitHub could not be reached, or the latest release has no package). See https://github.com/{Updates.Releases.Repo}/releases");
+            return 1;
+        }
+
+        if (latest.Version <= current)
+        {
+            stdout.WriteLine("You have the latest version.");
+            return 0;
+        }
+
+        stdout.WriteLine($"Downloading {latest.PackageName}...");
+        var (dir, error) = await Updates.Updater.Download(http, latest, CancellationToken.None);
+        if (dir is null)
+        {
+            stderr.WriteLine(error);
+            return 1;
+        }
+
+        Updates.Updater.Launch(new Updates.UpdatePlan(dir, latest.Version, Environment.ProcessId, Environment.CurrentDirectory, Restart: null));
+        stdout.WriteLine($"Checked against GitHub's SHA-256. The updater takes over now: it stops a running ancosSantiye and installs {Updates.Releases.Display(latest.Version)}.");
+        stdout.WriteLine($"Release notes: {latest.PageUrl}");
+        return 0;
+    }
 
     /// <summary>
     /// Runs on every status line refresh, so it must be quick and must never fail loudly:

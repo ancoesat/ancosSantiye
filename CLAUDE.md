@@ -26,7 +26,10 @@ Planning docs (R1, R2, R3): https://claude.ai/artifact/78unfekyyMxxhwxRZgeu1o
 | `src/AncosSantiye/Adapters/` | Claude Code hooks and status line feed, agy hooks, OpenCode plugin events, folder lane, status file parser |
 | `src/AncosSantiye/Actions/` | Commit and push, only when `actions.enabled` is true |
 | `src/AncosSantiye/Setup/` | Diagnose (finds AI tools, reads their integration) and Connectors (agy hooks.json entry, OpenCode plugin file, the `Connect` door for CLI and `/setup/*`) |
-| `src/AncosSantiye/Profiles/` | Profile model: skin, folder lane, actions switch (`--profile <file>`) |
+| `src/AncosSantiye/Profiles/` | Profile model: skin, folder lane (one status file or a `*` pattern), actions switch, update check (`--profile <file>`) |
+| `src/AncosSantiye/Updates/` | Releases (GitHub's latest, what the updater trusts), UpdateCheck (every 12 h), Updater (download, SHA-256 and nuspec check, update script) |
+| `.github/workflows/release.yml` | A pushed `v*.*.*` tag: version must match the csproj, `check.sh`, pack, GitHub release with the package |
+| `scripts/install-local.ps1` | Esat's dev loop: stop, pack this repo, reinstall, start |
 | `src/AncosSantiye/wwwroot/` | No-build front end: plain ES modules, Canvas 2D, EventSource |
 | `src/AncosSantiye/skins/grafxkid/` | CC0 sprites, their licenses, `skin.json` |
 | `tests/AncosSantiye.Tests/` | xUnit tests and fixtures |
@@ -49,7 +52,7 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 
 ## Rules
 
-1. Loopback only. The server binds to 127.0.0.1. Nothing listens on a public interface.
+1. Loopback only. The server binds to 127.0.0.1. Nothing listens on a public interface. Its one outgoing request is the update check (`Updates/`), which sends nothing about the machine and can be turned off; tests turn it off for the whole test assembly (`TestSetup.cs`).
 2. No NuGet packages in `src/`. Framework and standard library only. The test project may use xUnit.
 3. No build step for the front end. No npm, no bundler.
 4. Events never carry code, diffs, file contents or secrets. Only names, ids, counts, statuses. The speech bubble (`ClaudeHookMapper.Say`) may read exactly these parts of `tool_input`: the last segment of a file path, the agent's own `description`, a subagent or skill name, a URL's host. Task hooks may carry `task_id` and `task_subject` (the agent's own short title), never `task_description`. The desktop plan tool (`mcp__ccd_turn__update_plan`) may give each step's `content` and `status`, and `done`, `start`, `advance`; never a step's `session`. For background jobs: `run_in_background`, the job id from the result ("ID: x", nothing else of the result), `description`, and from the command only a whole-word program name on the `Lanes` allowlist (agy, opencode...), never anything else of the command. `UserPromptSubmit`: the prompt is never kept; only from a `<task-notification>` block, a well-formed `<task-id>` and a final `<status>` (completed, failed, killed, stopped). agy (`AgyHookMapper`): `conversationId`, the last folder of the first `workspacePaths` entry, `toolCall.name`, the last segment of a path field in `toolCall.args`, and whether `error` is set; never the command, `lastUserInput`, the transcript or the error text. OpenCode (`OpenCodeMapper`, and the plugin source in `Setup/Connectors.cs` that sends it): kind from a fixed list, session id, project folder name, tool name, a file's last segment, the tool's own `description` (first line, capped), todo `content` and `status`. Never a command, pattern, query, prompt or full path; every one of those has a test.
@@ -59,11 +62,14 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
    Known limit: a local program can read the token from `/config` like the page does. The agent deny list (`siyametrik-skills/claude-code/settings-ornek.json`) blocks `/actions/`, `/setup/` and `/config` on localhost; keep actions off when you do not need them.
 7. Sprites come from packs with a license that allows redistribution (CC0 today). Never draw pixel art by hand. Simple shapes in code (rectangles, lines) are fine.
 8. No em or en dashes anywhere: code, comments, docs, UI text.
-9. Git: no commits, pushes or branches from any agent, and no calls to `/actions/*` either. Esat commits and pushes, by terminal or from the screen.
+9. Updates install only from `Releases.Repo`'s own release downloads, with GitHub's SHA-256, package id AncosSantiye and the release's exact version. Never widen that, never skip a check, never install from a URL the request or a page supplies.
+10. Git: no commits, pushes or branches from any agent, and no calls to `/actions/*` either. Esat commits and pushes, by terminal or from the screen.
 
 ## Lessons
 
 - When two lanes work in this tree at once, commit with the piece's own paths (`git add <paths>`), never `git add -A`. A lane's "done" is checked with `git status`, not with its report.
+- `git push` does not send tags. Push a release tag on its own (`git push origin v0.4.0`), or GitHub never sees it and the release workflow never runs (v0.2.4 and v0.3.0 stayed local this way).
+- The building follows the status table, not the session's plan list. A project without its status file in the folder lane shows only the current turn's plan, which starts at 0 every turn.
 - Mutation-check every gate and test that guards a rule: break it on purpose, it must fail. (F0: the dash grep passed a dash because a missing path made grep exit 2.)
 - A command that writes a user's config accepts exact argument shapes only. A typo must never fall back to the real file. (F2 review.)
 - Settings files are refused, not repaired, when the parts we touch have an unexpected shape, comments or duplicate keys. Always back up before writing.

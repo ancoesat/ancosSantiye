@@ -96,6 +96,37 @@ header::after {
 
 .brand:hover span { color: #ffd24a; }
 
+/* The version, small, under the wordmark's baseline; an update shows as a yellow link */
+.version {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: -8px;
+  align-self: flex-end;
+  padding-bottom: 6px;
+  font-size: 11px;
+  color: var(--quiet);
+  white-space: nowrap;
+}
+
+.version-current { font-family: var(--mono); }
+
+.version-update {
+  font: inherit;
+  font-weight: 700;
+  padding: 1px 8px;
+  border: 1px solid var(--hazard);
+  border-radius: 999px;
+  background: var(--hazard-dim);
+  color: var(--hazard);
+  cursor: pointer;
+}
+
+.version-update:hover { background: var(--hazard); color: #15171b; }
+.version-notes { color: var(--quiet); }
+.version-notes:hover { color: var(--hazard); }
+.version-status:empty { display: none; }
+
 /* The project sign next to the logo */
 .site-sign {
   display: flex;
@@ -145,41 +176,9 @@ header::after {
 }
 
 .nav:hover { border-color: var(--hazard); color: var(--hazard); background: var(--hazard-dim); }
-.nav + #connection { margin-left: 0; }
-
-#connection {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-left: auto;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--line);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--quiet);
-}
-
-#connection::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-#connection.on { color: var(--ok); border-color: rgba(95, 196, 106, 0.4); }
-#connection.on::before { box-shadow: 0 0 0 0 rgba(95, 196, 106, 0.7); animation: pulse 2s infinite; }
-#connection.off { color: var(--off); border-color: rgba(229, 83, 75, 0.4); }
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(95, 196, 106, 0.6); }
-  70% { box-shadow: 0 0 0 7px rgba(95, 196, 106, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(95, 196, 106, 0); }
-}
+.nav + /* Nothing while connected; plain red text only when the server is gone. */
+#connection { display: none; font-size: 12px; font-weight: 600; }
+#connection.off { display: inline; color: var(--off); }
 
 main {
   flex: 1;

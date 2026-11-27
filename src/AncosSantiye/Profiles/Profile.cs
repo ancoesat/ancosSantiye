@@ -3,8 +3,40 @@ using AncosSantiye.Events;
 
 namespace AncosSantiye.Profiles;
 
-/// <summary>Watches a folder for a status file and delivery files (see <c>Adapters/FolderLane</c>).</summary>
-public sealed record FolderLaneProfile(string Directory, string StatusFile, string Project, double IntervalSeconds = 1);
+/// <summary>
+/// Watches a folder for status files and delivery files (see <c>Adapters/FolderLane</c>).
+/// One file and its project (<c>"rovans-durum.md"</c>, <c>"rovans"</c>), or every file that matches one
+/// <c>*</c> (<c>"*-durum.md"</c>), where the part under the <c>*</c> names the project: <c>kbyte-durum.md</c>
+/// is the project <c>kbyte</c>, the same name a session gets from its folder.
+/// </summary>
+public sealed record FolderLaneProfile(string Directory, string StatusFile, string? Project = null, double IntervalSeconds = 1)
+{
+    public bool IsPattern => StatusFile.Contains('*');
+
+    /// <summary>The project a status file belongs to, or null when the file is not one this lane reads.</summary>
+    public string? ProjectOf(string fileName)
+    {
+        if (!IsPattern)
+        {
+            return string.Equals(fileName, StatusFile, StringComparison.OrdinalIgnoreCase) ? Project : null;
+        }
+
+        var star = StatusFile.IndexOf('*');
+        var (prefix, suffix) = (StatusFile[..star], StatusFile[(star + 1)..]);
+        var project = fileName.Length > prefix.Length + suffix.Length
+                      && fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                      && fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+            ? fileName[prefix.Length..^suffix.Length]
+            : null;
+        return string.IsNullOrWhiteSpace(project) ? null : project;
+    }
+
+    /// <summary>Whether this lane reads a status file for <paramref name="project"/> right now.</summary>
+    public bool Watches(string project) =>
+        IsPattern
+            ? File.Exists(Path.Combine(Directory, StatusFile.Replace("*", project, StringComparison.Ordinal)))
+            : string.Equals(project, Project, StringComparison.OrdinalIgnoreCase);
+}
 
 /// <summary>Commit and push from the screen. Off unless enabled, and only for the repos listed here.</summary>
 public sealed record ActionsProfile(bool Enabled = false, string[]? Repos = null);
@@ -17,7 +49,8 @@ public sealed record Profile(
     string Skin = "grafxkid",
     string? SkinPath = null,
     FolderLaneProfile? FolderLane = null,
-    ActionsProfile? Actions = null)
+    ActionsProfile? Actions = null,
+    bool UpdateCheck = true)
 {
     public static Profile Default { get; } = new();
 
@@ -63,9 +96,16 @@ public sealed record Profile(
     private static (Profile?, string?) Validate(Profile p, string path)
     {
         if (p.FolderLane is { } lane
-            && (string.IsNullOrWhiteSpace(lane.Directory) || string.IsNullOrWhiteSpace(lane.StatusFile) || string.IsNullOrWhiteSpace(lane.Project)))
+            && (string.IsNullOrWhiteSpace(lane.Directory) || string.IsNullOrWhiteSpace(lane.StatusFile)
+                || (!lane.IsPattern && string.IsNullOrWhiteSpace(lane.Project))))
         {
-            return (null, $"Profile {path}: folderLane needs directory, statusFile and project.");
+            return (null, $"Profile {path}: folderLane needs directory, statusFile and project (or a statusFile with one * such as \"*-durum.md\").");
+        }
+
+        if (p.FolderLane is { } pattern
+            && (pattern.StatusFile.Count(c => c == '*') > 1 || pattern.StatusFile.IndexOfAny(['/', '\\', '?']) >= 0))
+        {
+            return (null, $"Profile {path}: folderLane.statusFile is a file name in the folder, with at most one *.");
         }
 
         if (p.FolderLane is { IntervalSeconds: <= 0 or > 60 })

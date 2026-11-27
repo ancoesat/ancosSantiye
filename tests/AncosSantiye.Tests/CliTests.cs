@@ -28,6 +28,18 @@ public class CliTests
         Assert.Contains("ctx 5%", output.ToString());
     }
 
+    [Theory]
+    [InlineData("version")]
+    [InlineData("--version")]
+    public async Task Version_PrintsTheVersion(string arg)
+    {
+        var output = new StringWriter();
+
+        Assert.False(Cli.IsServerStart([arg]));
+        Assert.Equal(0, await Cli.Run([arg], new StringReader(""), output, new StringWriter()));
+        Assert.Equal(AncosSantiye.Updates.Releases.Display(AncosSantiye.Updates.Releases.Current), output.ToString().Trim());
+    }
+
     [Fact]
     public async Task AgyHook_ServerDown_StillAnswersWithEmptyJson()
     {

@@ -35,6 +35,14 @@ From a release (download `AncosSantiye.<version>.nupkg` from [Releases](https://
 dotnet tool install --global AncosSantiye --add-source <folder with the .nupkg>
 ```
 
+### Updates
+
+The version is in small type next to the logo. The server asks GitHub for a newer release when it starts and every 12 hours (one request to api.github.com; nothing about your computer is sent). When there is one, an "available, update" link appears there. Click it, confirm, and the server does the rest: it downloads the package from this repo's release, checks it against the SHA-256 that GitHub shows for it, stops, installs it with `dotnet tool update`, and starts again with the same options. The page reloads itself when the new version answers.
+
+In a terminal, `ancos-santiye update` does the same (it stops a running server too; start it again afterwards). `ancos-santiye version` prints the version. To turn the check off, put `"updateCheck": false` in your profile.
+
+Working on ancosSantiye itself: `./scripts/install-local.ps1 [server options]` stops the running tool, packs this repo, installs it over the old one and starts it.
+
 From source:
 
 ```bash
@@ -94,7 +102,8 @@ Without a profile you get the built-in skin, Claude Code data only, and a read-o
     "project": "my-project",       // the repo folder name, so it joins that project's sessions
     "intervalSeconds": 1
   },
-  "actions": { "enabled": false, "repos": [] }
+  "actions": { "enabled": false, "repos": [] },
+  "updateCheck": true              // ask GitHub for new releases (see Updates)
 }
 ```
 
@@ -110,6 +119,8 @@ The site shows one project at a time. A project is the folder a Claude Code sess
 
 ### Folder lane
 
+One status file per project, or all of them: with `"statusFile": "*-durum.md"` (and no `project`) every matching file is read, and the part under the `*` names its project: `rovans-durum.md` is the project `rovans`, the same name a session in the `rovans` folder gets. New files are picked up while the server runs.
+
 The status file is a markdown table. The server reads it when it changes and turns differences into events (stage, piece status, review verdicts, gates). A row whose status is `onay bekliyor` ("waiting for approval") is a gate. See [`profiles/example-status.md`](profiles/example-status.md):
 
 ```markdown
@@ -120,6 +131,8 @@ Stage: F2
 | my-project-001 | Login page | claude / opus | draft / mid | bitti | ONAY | 0 | |
 | my-project-003 | Pricing copy | reader / gemini | draft / low | onay bekliyor | | 0 | |
 ```
+
+Its rows are the building: finished pieces are brick walls at the bottom, open ones (on the site, waiting for approval, sent back) above them, and the rest are outlines still to build. The building has room for 24 pieces; with more, every open piece keeps its place and the finished ones fill the rest (the Pieces panel lists them all). The `Stage:` line is free text; only its first word (`F4`, `P6`, `R2`, `done`) is read.
 
 A file half written by an editor never clears your gates: an empty read after a full one is skipped and read again on the next tick.
 
@@ -153,6 +166,7 @@ How it is guarded: the endpoints do not exist unless actions are on. Every reque
 ## Security and privacy
 
 - The server only listens on loopback (`127.0.0.1` or `localhost`) and refuses to start on any other address.
+- Its only outgoing request is the update check: one GET to api.github.com for this repo's latest release, at start and every 12 hours (`"updateCheck": false` turns it off). An update installs only a package from this repo's own release downloads whose SHA-256 matches the one GitHub shows, whose package id is AncosSantiye and whose version is the release's. The Update link sits behind the same door as the Connect buttons.
 - Hook endpoints (Claude Code, agy, OpenCode) refuse requests that carry an `Origin` header (a browser) and anything that is not JSON.
 - The Connect buttons write other tools' config files, so `/setup/connect` and `/setup/disconnect` need the page's own Origin, JSON and a per-start token of their own (a different one from commit and push). Add `/setup/*` to your agent's deny list (see the example in [siyametrik-skills](https://github.com/ancoesat/siyametrik-skills)).
 - From agy only the tool name, a file's last segment and whether it failed are read; never the command, the prompt (`lastUserInput`) or the transcript. The OpenCode plugin sends only the tool name, a file's last segment, the tool's own short description, todo titles and statuses, and session ids.
