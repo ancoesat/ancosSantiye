@@ -69,6 +69,7 @@ dotnet tool install -g AncosSantiye --add-source artifacts  # try the package (u
 
 - When two lanes work in this tree at once, commit with the piece's own paths (`git add <paths>`), never `git add -A`. A lane's "done" is checked with `git status`, not with its report.
 - `git push` does not send tags. Push a release tag on its own (`git push origin v0.4.0`), or GitHub never sees it and the release workflow never runs (v0.2.4 and v0.3.0 stayed local this way).
+- GitHub starts no workflow for tags when more than three are pushed at once. Push a release tag alone. (v0.4.0 was pushed with three old tags and got no release.)
 - The building follows the status table, not the session's plan list. A project without its status file in the folder lane shows only the current turn's plan, which starts at 0 every turn.
 - Mutation-check every gate and test that guards a rule: break it on purpose, it must fail. (F0: the dash grep passed a dash because a missing path made grep exit 2.)
 - A command that writes a user's config accepts exact argument shapes only. A typo must never fall back to the real file. (F2 review.)
